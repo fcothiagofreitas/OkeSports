@@ -1,0 +1,361 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// 1. ORGANIZADOR (User)
+// ============================================
+
+model User {
+  // Identificação
+  id       String @id @default(cuid())
+  email    String @unique
+  password String // bcrypt hash
+
+  // Dados Pessoais
+  fullName String
+  cpfCnpj  String @unique
+  phone    String
+
+  // Endereço
+  address Address?
+
+  // Mercado Pago OAuth
+  mpConnected      Boolean   @default(false)
+  mpUserId         String?   @unique
+  mpAccessToken    String?   // AES-256 encrypted
+  mpRefreshToken   String?   // AES-256 encrypted
+  mpPublicKey      String?
+  mpTokenExpiresAt DateTime?
+
+  // Relacionamentos
+  events Event[]
+
+  // Auditoria
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastLoginAt     DateTime?
+  emailVerified   Boolean   @default(false)
+  emailVerifiedAt DateTime?
+
+  @@map("users")
+}
+
+model Address {
+  id           String @id @default(cuid())
+  userId       String @unique
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cep          String
+  street       String
+  number       String
+  complement   String?
+  neighborhood String
+  city         String
+  state        String // UF (SP, RJ, etc)
+  country      String @default("BR")
+
+  @@map("addresses")
+}
+
+// ============================================
+// 2. ATLETA (Participant)
+// ============================================
+
+model Participant {
+  // Identificação
+  id       String  @id @default(cuid())
+  email    String  @unique
+  password String? // null se criado por terceiro
+
+  // Dados Pessoais
+  fullName  String
+  cpf       String   @unique
+  phone     String
+  birthDate DateTime
+  gender    Gender   @default(NOT_INFORMED)
+
+  // Endereço Completo
+  address ParticipantAddress?
+
+  // Relacionamentos
+  registrations Registration[]
+
+  // Configurações
+  receiveMarketing Boolean @default(true)
+
+  // Auditoria
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+  emailVerified Boolean   @default(false)
+
+  @@map("participants")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  NOT_INFORMED
+}
+
+model ParticipantAddress {
+  id            String      @id @default(cuid())
+  participantId String      @unique
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  cep           String
+  street        String
+  number        String
+  complement    String?
+  neighborhood  String
+  city          String
+  state         String
+  country       String      @default("BR")
+
+  @@map("participant_addresses")
+}
+
+// ============================================
+// 3. EVENTO (Event)
+// ============================================
+
+model Event {
+  // Identificação
+  id   String @id @default(cuid())
+  slug String @unique // URL amigável: corrida-sp-2025
+
+  // Informações Básicas
+  name             String // "Corrida de São Paulo 2025"
+  description      String @db.Text
+  shortDescription String? // Resumo para cards
+
+  // Datas
+  eventDate         DateTime // Data do evento real
+  registrationStart DateTime // Início das inscrições
+  registrationEnd   DateTime // Fim das inscrições
+
+  // Localização
+  location EventLocation?
+
+  // Visual
+  bannerUrl String? // Banner principal
+  logoUrl   String? // Logo do evento
+  coverUrl  String? // Capa para redes sociais
+
+  // Configurações
+  status           EventStatus @default(DRAFT)
+  maxRegistrations Int? // Limite total de vagas (null = ilimitado)
+  allowGroupReg    Boolean     @default(true) // Permitir inscrever terceiros
+  maxGroupSize     Int         @default(10) // Limite de pessoas por compra
+
+  // DNS Customizado (futuro)
+  customDomain String? @unique
+
+  // Relacionamentos
+  organizerId String
+  organizer   User   @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+
+  modalities    Modality[]
+  batches       Batch[]
+  coupons       Coupon[]
+  registrations Registration[]
+
+  // Auditoria
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+
+  @@index([slug])
+  @@index([eventDate])
+  @@index([status])
+  @@index([organizerId])
+  @@map("events")
+}
+
+enum EventStatus {
+  DRAFT      // Rascunho
+  PUBLISHED  // Publicado (inscrições abertas)
+  PAUSED     // Pausado (visível mas não aceita inscrições)
+  SOLD_OUT   // Esgotado
+  FINISHED   // Evento já aconteceu
+  CANCELLED  // Cancelado
+}
+
+model EventLocation {
+  id           String  @id @default(cuid())
+  eventId      String  @unique
+  event        Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  venueName    String? // Nome do local (ex: Parque Ibirapuera)
+  street       String
+  number       String
+  complement   String?
+  neighborhood String
+  city         String
+  state        String
+  cep          String
+  latitude     Float? // Coordenadas para mapa
+  longitude    Float?
+
+  @@map("event_locations")
+}
+
+// ============================================
+// 4. MODALIDADES (Modality)
+// ============================================
+
+model Modality {
+  id          String  @id @default(cuid())
+  eventId     String
+  event       Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name        String // "5km", "10km", "21km"
+  description String? // Detalhes adicionais
+  price       Decimal @db.Decimal(10, 2) // Preço base
+  maxSlots    Int? // Vagas disponíveis (null = ilimitado)
+  soldSlots   Int     @default(0) // Vendidas
+  order       Int     @default(0) // Ordem de exibição
+  active      Boolean @default(true)
+
+  // Relacionamentos
+  registrations Registration[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([eventId])
+  @@map("modalities")
+}
+
+// ============================================
+// 5. LOTES (Batch)
+// ============================================
+
+model Batch {
+  id           String       @id @default(cuid())
+  eventId      String
+  event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name         String // "1º Lote", "Early Bird"
+  type         BatchType    @default(DATE) // Por data ou volume
+  startDate    DateTime? // Período (se type = DATE)
+  endDate      DateTime?
+  maxSales     Int? // Volume (se type = VOLUME)
+  currentSales Int          @default(0)
+  discountType DiscountType? // PERCENTAGE ou FIXED
+  discountValue Decimal?     @db.Decimal(10, 2)
+  active       Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([eventId])
+  @@map("batches")
+}
+
+enum BatchType {
+  DATE   // Por período de tempo
+  VOLUME // Por quantidade vendida
+}
+
+enum DiscountType {
+  PERCENTAGE // Percentual (ex: 10%)
+  FIXED      // Valor fixo (ex: R$ 20)
+}
+
+// ============================================
+// 6. CUPONS (Coupon)
+// ============================================
+
+model Coupon {
+  id            String       @id @default(cuid())
+  eventId       String
+  event         Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  code          String // CORRIDA10, AMIGO20
+  discountType  DiscountType // PERCENTAGE ou FIXED
+  discountValue Decimal      @db.Decimal(10, 2)
+  startDate     DateTime
+  endDate       DateTime
+  maxUses       Int? // null = ilimitado
+  currentUses   Int          @default(0)
+  modalityIds   String[] // Array de IDs (vazio = todas)
+  minPurchase   Decimal?     @db.Decimal(10, 2)
+  active        Boolean      @default(true)
+
+  // Relacionamentos
+  registrations Registration[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([eventId, code])
+  @@index([code])
+  @@map("coupons")
+}
+
+// ============================================
+// 7. INSCRIÇÃO (Registration)
+// ============================================
+
+model Registration {
+  id            String  @id @default(cuid())
+  eventId       String
+  event         Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  modalityId    String
+  modality      Modality @relation(fields: [modalityId], references: [id])
+  participantId String
+  participant   Participant @relation(fields: [participantId], references: [id])
+  buyerId       String? // Participant.id de quem fez a compra
+  couponId      String?
+  coupon        Coupon?     @relation(fields: [couponId], references: [id])
+
+  // Valores
+  basePrice   Decimal @db.Decimal(10, 2) // Preço original
+  discount    Decimal @db.Decimal(10, 2) @default(0)
+  subtotal    Decimal @db.Decimal(10, 2) // basePrice - discount
+  platformFee Decimal @db.Decimal(10, 2) // 10% da subtotal
+  total       Decimal @db.Decimal(10, 2) // subtotal + platformFee
+
+  // Pagamento
+  paymentId     String?        @unique // ID do Mercado Pago
+  paymentStatus PaymentStatus  @default(PENDING)
+  paymentMethod String? // pix, credit_card, boleto
+
+  // Número da Inscrição (sequencial por evento)
+  registrationNumber Int
+
+  // Status
+  status RegistrationStatus @default(PENDING)
+
+  // Check-in (futuro)
+  checkedIn   Boolean   @default(false)
+  checkedInAt DateTime?
+
+  // Auditoria
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  confirmedAt DateTime? // Quando pagamento confirmado
+  cancelledAt DateTime?
+
+  @@unique([eventId, registrationNumber])
+  @@index([eventId])
+  @@index([participantId])
+  @@index([paymentId])
+  @@map("registrations")
+}
+
+enum PaymentStatus {
+  PENDING    // Aguardando pagamento
+  PROCESSING // Processando
+  APPROVED   // Aprovado
+  REJECTED   // Rejeitado
+  CANCELLED  // Cancelado
+  REFUNDED   // Reembolsado
+}
+
+enum RegistrationStatus {
+  PENDING   // Aguardando pagamento
+  CONFIRMED // Confirmada (paga)
+  CANCELLED // Cancelada
+}
