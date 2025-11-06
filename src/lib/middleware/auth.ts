@@ -20,10 +20,11 @@ import type { AuthTokenPayload } from '@/types/auth';
  */
 export function withAuth(
   handler: (
-    request: NextRequest & { user: AuthTokenPayload }
+    request: NextRequest & { user: AuthTokenPayload },
+    context?: any
   ) => Promise<NextResponse> | NextResponse
 ) {
-  return async (request: NextRequest): Promise<NextResponse> => {
+  return async (request: NextRequest, context?: any): Promise<NextResponse> => {
     try {
       // Extract Authorization header
       const authHeader = request.headers.get('Authorization');
@@ -48,7 +49,7 @@ export function withAuth(
       authenticatedRequest.user = payload;
 
       // Call the original handler
-      return await handler(authenticatedRequest);
+      return await handler(authenticatedRequest, context);
     } catch (error) {
       if (error instanceof Error && error.message.includes('Invalid access token')) {
         return NextResponse.json(
