@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -13,6 +13,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthStore } from '@/stores/authStore';
 import { ArrowLeft } from 'lucide-react';
+
+const STORAGE_KEY = 'event-draft-form';
 
 const eventSchema = z.object({
   name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
@@ -34,14 +36,43 @@ export default function NewEventPage() {
   const { accessToken } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasDraft, setHasDraft] = useState(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
+    watch,
+    reset,
   } = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
   });
+
+  // Carregar rascunho do localStorage ao montar
+  useEffect(() => {
+    const savedDraft = localStorage.getItem(STORAGE_KEY);
+    if (savedDraft) {
+      try {
+        const draftData = JSON.parse(savedDraft);
+        reset(draftData);
+        setHasDraft(true);
+      } catch (error) {
+        console.error('Erro ao carregar rascunho:', error);
+      }
+    }
+  }, [reset]);
+
+  // Auto-save: salvar no localStorage quando os campos mudarem
+  useEffect(() => {
+    const subscription = watch((formData) => {
+      // Só salvar se pelo menos um campo foi preenchido
+      if (formData.name || formData.description) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [watch]);
 
   const onSubmit = async (data: EventFormData) => {
     try {
@@ -80,12 +111,23 @@ export default function NewEventPage() {
         throw new Error(result.error || 'Erro ao criar evento');
       }
 
+      // Limpar rascunho do localStorage após sucesso
+      localStorage.removeItem(STORAGE_KEY);
+
       // Redirecionar para edição do evento
       router.push(`/dashboard/events/${result.id}/edit`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const clearDraft = () => {
+    if (confirm('Tem certeza que deseja limpar o rascunho salvo?')) {
+      localStorage.removeItem(STORAGE_KEY);
+      reset({});
+      setHasDraft(false);
     }
   };
 
@@ -112,13 +154,35 @@ export default function NewEventPage() {
       <main className="max-w-4xl mx-auto px-6 lg:px-10 py-12">
         <Card>
           <CardHeader>
-            <CardTitle>Informações Básicas</CardTitle>
-            <CardDescription>
-              Você poderá adicionar modalidades e lotes na próxima etapa
-            </CardDescription>
+            <div className="flex justify-between items-start">
+              <div>
+                <CardTitle>Informações Básicas</CardTitle>
+                <CardDescription>
+                  Você poderá adicionar modalidades e lotes na próxima etapa
+                </CardDescription>
+              </div>
+              {hasDraft && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearDraft}
+                  className="text-xs"
+                >
+                  Limpar rascunho
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              {hasDraft && (
+                <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-800 border border-blue-200">
+                  ℹ️ Rascunho restaurado automaticamente. Seus dados estão sendo salvos enquanto você
+                  digita.
+                </div>
+              )}
+
               {error && (
                 <div className="rounded-md bg-red-50 p-4 text-sm text-red-800">{error}</div>
               )}
