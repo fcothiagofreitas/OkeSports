@@ -12,11 +12,11 @@ import { ZodError } from 'zod';
 
 async function getEvent(
   request: NextRequest & { user: { userId: string } },
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ eventId: string }> }
 ) {
   try {
     const { userId } = request.user;
-    const { id } = await params;
+    const { eventId: id } = await params;
 
     const event = await prisma.event.findUnique({
       where: { id },
@@ -68,11 +68,11 @@ async function getEvent(
 
 async function updateEvent(
   request: NextRequest & { user: { userId: string } },
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ eventId: string }> }
 ) {
   try {
     const { userId } = request.user;
-    const { id } = await params;
+    const { eventId: id } = await params;
     const body = await request.json();
 
     // Validar dados
@@ -161,11 +161,11 @@ async function updateEvent(
 
 async function deleteEvent(
   request: NextRequest & { user: { userId: string } },
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ eventId: string }> }
 ) {
   try {
     const { userId } = request.user;
-    const { id } = await params;
+    const { eventId: id } = await params;
 
     // Verificar se evento existe e pertence ao usuário
     const event = await prisma.event.findUnique({
