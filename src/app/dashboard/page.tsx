@@ -10,13 +10,19 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user, accessToken, logout } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    // Verificar se está autenticado
-    if (!user || !accessToken) {
+    // Aguardar hidratação do Zustand
+    setIsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    // Verificar se está autenticado apenas após hidratação
+    if (isHydrated && (!user || !accessToken)) {
       router.push('/login');
     }
-  }, [user, accessToken, router]);
+  }, [user, accessToken, router, isHydrated]);
 
   const handleLogout = () => {
     logout();
@@ -48,21 +54,22 @@ export default function DashboardPage() {
     }
   };
 
-  if (!user) {
+  // Mostrar loading enquanto hidrata
+  if (!isHydrated || !user) {
     return null;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navbar */}
-      <nav className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
+    <div className="min-h-screen bg-[hsl(var(--gray-100))]">
+      {/* Navbar com estilo Dribbble */}
+      <nav className="bg-white border-b border-[hsl(var(--gray-200))] backdrop-blur-sm bg-white/90 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 lg:px-10">
+          <div className="flex justify-between h-20">
             <div className="flex items-center">
-              <h1 className="text-xl font-bold text-primary">🏃 Okê Sports</h1>
+              <h1 className="text-2xl font-bold text-[hsl(var(--accent-pink))] font-sans">🏃 Okê Sports</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">{user.email}</span>
+            <div className="flex items-center space-x-6">
+              <span className="text-sm font-medium text-[hsl(var(--gray-600))]">{user.email}</span>
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 Sair
               </Button>
@@ -71,11 +78,11 @@ export default function DashboardPage() {
         </div>
       </nav>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900">Dashboard</h2>
-          <p className="mt-2 text-gray-600">Bem-vindo, {user.fullName}!</p>
+      {/* Main Content com espaçamento Dribbble */}
+      <main className="max-w-7xl mx-auto px-6 lg:px-10 py-12">
+        <div className="mb-12">
+          <h2 className="text-4xl font-bold text-[hsl(var(--dark))] mb-2 font-sans">Dashboard</h2>
+          <p className="text-lg text-[hsl(var(--gray-600))]">Bem-vindo, {user.fullName}!</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -135,7 +142,7 @@ export default function DashboardPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="text-center">
-                <p className="text-3xl font-bold text-primary">0</p>
+                <p className="text-3xl font-bold text-[hsl(var(--dark))]">0</p>
                 <p className="text-sm text-gray-600 mt-1">Eventos Ativos</p>
               </div>
             </CardContent>
@@ -144,7 +151,7 @@ export default function DashboardPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="text-center">
-                <p className="text-3xl font-bold text-primary">0</p>
+                <p className="text-3xl font-bold text-[hsl(var(--dark))]">0</p>
                 <p className="text-sm text-gray-600 mt-1">Inscrições</p>
               </div>
             </CardContent>
