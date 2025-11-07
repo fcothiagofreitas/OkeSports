@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthStore } from '@/stores/authStore';
@@ -117,9 +118,11 @@ export default function DashboardPage() {
               <CardDescription>Gerencie seus eventos esportivos</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button variant="outline" className="w-full" disabled>
-                Ver Eventos (Em breve)
-              </Button>
+              <Link href="/dashboard/events">
+                <Button variant="outline" className="w-full">
+                  Ver Eventos
+                </Button>
+              </Link>
             </CardContent>
           </Card>
 
