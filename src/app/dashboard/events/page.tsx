@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/stores/authStore';
+import { apiGet, apiDelete, ApiError } from '@/lib/api';
 import { Calendar, MapPin, Users, Plus, Edit, Trash2 } from 'lucide-react';
 
 interface Event {
@@ -39,20 +40,13 @@ export default function EventsPage() {
   const fetchEvents = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/events', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setEvents(data.events);
-      } else {
-        console.error('Erro ao buscar eventos:', data.error);
-      }
+      const data = await apiGet<{ events: Event[] }>('/api/events');
+      setEvents(data.events);
     } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        // Redireciona automaticamente para login
+        return;
+      }
       console.error('Erro ao buscar eventos:', error);
     } finally {
       setIsLoading(false);
@@ -65,22 +59,15 @@ export default function EventsPage() {
     }
 
     try {
-      const response = await fetch(`/api/events/${eventId}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      if (response.ok) {
-        setEvents(events.filter((e) => e.id !== eventId));
-      } else {
-        const data = await response.json();
-        alert(data.error || 'Erro ao deletar evento');
-      }
+      await apiDelete(`/api/events/${eventId}`);
+      setEvents(events.filter((e) => e.id !== eventId));
     } catch (error) {
+      if (error instanceof ApiError) {
+        alert(error.message);
+      } else {
+        alert('Erro ao deletar evento');
+      }
       console.error('Erro ao deletar evento:', error);
-      alert('Erro ao deletar evento');
     }
   };
 
