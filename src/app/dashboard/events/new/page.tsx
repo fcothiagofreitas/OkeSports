@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthStore } from '@/stores/authStore';
+import { apiPost } from '@/lib/api';
 import { ArrowLeft } from 'lucide-react';
 
 const STORAGE_KEY = 'event-draft-form';
@@ -33,7 +34,7 @@ type EventFormData = z.infer<typeof eventSchema>;
 
 export default function NewEventPage() {
   const router = useRouter();
-  const { accessToken } = useAuthStore();
+  const { accessToken, logout } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasDraft, setHasDraft] = useState(false);
@@ -47,6 +48,14 @@ export default function NewEventPage() {
   } = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
   });
+
+  // Verificar se tem token válido
+  useEffect(() => {
+    if (!accessToken) {
+      logout();
+      router.push('/login?expired=true');
+    }
+  }, [accessToken, logout, router]);
 
   // Carregar rascunho do localStorage ao montar
   useEffect(() => {
@@ -96,28 +105,18 @@ export default function NewEventPage() {
         },
       };
 
-      const response = await fetch('/api/events', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify(requestData),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Erro ao criar evento');
-      }
+      const result = await apiPost('/api/events', requestData);
 
       // Limpar rascunho do localStorage após sucesso
       localStorage.removeItem(STORAGE_KEY);
 
       // Redirecionar para edição do evento
       router.push(`/dashboard/events/${result.id}/edit`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido');
+    } catch (err: any) {
+      // Se token expirado, apiPost já redirecionou para login
+      if (err.status !== 401) {
+        setError(err.message || 'Erro ao criar evento');
+      }
     } finally {
       setIsLoading(false);
     }
