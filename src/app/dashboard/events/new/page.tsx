@@ -105,9 +105,17 @@ export default function NewEventPage() {
       // Redirecionar para edição do evento
       router.push(`/dashboard/events/${result.id}/edit`);
     } catch (err: any) {
+      console.error('Erro ao criar evento:', err);
+
       // Se token expirado, apiPost já redirecionou para login
       if (err.status !== 401) {
-        setError(err.message || 'Erro ao criar evento');
+        // Mostrar detalhes do erro de validação se houver
+        if (err.data?.details) {
+          const validationErrors = err.data.details.map((e: any) => e.message).join(', ');
+          setError(`Dados inválidos: ${validationErrors}`);
+        } else {
+          setError(err.message || 'Erro ao criar evento');
+        }
       }
     } finally {
       setIsLoading(false);
