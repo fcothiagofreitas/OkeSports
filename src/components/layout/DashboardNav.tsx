@@ -32,7 +32,7 @@ export function DashboardNav() {
   ];
 
   return (
-    <nav className="bg-white border-b border-[hsl(var(--gray-200))] backdrop-blur-sm bg-white/90 sticky top-0 z-50">
+    <nav className="bg-white border-b border-[hsl(var(--gray-200))]">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         <div className="flex justify-between h-20">
           {/* Logo e Menu */}
