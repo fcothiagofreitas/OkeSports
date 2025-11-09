@@ -221,7 +221,7 @@ export default function EditEventPage() {
 
       {/* Header */}
       <div className="bg-white border-b border-[hsl(var(--gray-200))]">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10 py-8">
+        <div className="max-w-7xl mx-auto px-6 lg:px-10 pt-8 pb-0">
           <Link
             href="/dashboard/events"
             className="inline-flex items-center text-sm text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] mb-4 cursor-pointer"
