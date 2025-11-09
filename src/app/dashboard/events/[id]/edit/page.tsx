@@ -217,7 +217,7 @@ export default function EditEventPage() {
 
       {/* Header */}
       <div className="bg-white border-b border-[hsl(var(--gray-200))]">
-        <div className="max-w-6xl mx-auto px-6 lg:px-10 py-8">
+        <div className="max-w-7xl mx-auto px-6 lg:px-10 py-8">
           <Link
             href="/dashboard/events"
             className="inline-flex items-center text-sm text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] mb-4 cursor-pointer"
@@ -228,9 +228,9 @@ export default function EditEventPage() {
           <div className="flex justify-between items-start">
             <div>
               <h1 className="text-4xl font-bold text-[hsl(var(--dark))] font-sans">
-                Editar Evento
+                {event?.name}
               </h1>
-              <p className="text-lg text-[hsl(var(--gray-600))] mt-2">{event?.name}</p>
+              <p className="text-lg text-[hsl(var(--gray-600))] mt-2">Editar Evento</p>
             </div>
             <div className="flex gap-3 items-center">
               {getStatusBadge(event?.status || 'DRAFT')}
@@ -275,7 +275,7 @@ export default function EditEventPage() {
       </div>
 
       {/* Form */}
-      <main className="max-w-6xl mx-auto px-6 lg:px-10 py-8 pb-12">
+      <main className="max-w-7xl mx-auto px-6 lg:px-10 py-12">
         <Card>
               <CardHeader>
                 <CardTitle>Informações Básicas</CardTitle>

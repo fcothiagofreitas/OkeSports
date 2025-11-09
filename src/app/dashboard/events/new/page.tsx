@@ -149,7 +149,7 @@ export default function NewEventPage() {
 
       {/* Header */}
       <div className="bg-white border-b border-[hsl(var(--gray-200))]">
-        <div className="max-w-4xl mx-auto px-6 lg:px-10 py-8">
+        <div className="max-w-7xl mx-auto px-6 lg:px-10 py-8">
           <Link
             href="/dashboard/events"
             className="inline-flex items-center text-sm text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] mb-4 cursor-pointer"
@@ -165,7 +165,7 @@ export default function NewEventPage() {
       </div>
 
       {/* Form */}
-      <main className="max-w-4xl mx-auto px-6 lg:px-10 py-12">
+      <main className="max-w-7xl mx-auto px-6 lg:px-10 py-12">
         <Card>
           <CardHeader>
             <div className="flex justify-between items-start">
