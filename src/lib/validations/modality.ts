@@ -11,7 +11,7 @@ export const createModalitySchema = z.object({
   eventId: z.string().cuid(),
   name: z.string().min(1, 'Nome é obrigatório').max(100),
   description: z.string().max(500).optional(),
-  price: z.number().positive('Preço deve ser positivo').multipleOf(0.01),
+  price: z.number().min(0, 'Preço não pode ser negativo').multipleOf(0.01),
   maxSlots: z.number().int().positive().optional(),
   order: z.number().int().min(0).default(0),
   active: z.boolean().default(true),
@@ -23,7 +23,7 @@ export const createModalitySchema = z.object({
 export const updateModalitySchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).optional().nullable(),
-  price: z.number().positive().multipleOf(0.01).optional(),
+  price: z.number().min(0).multipleOf(0.01).optional(),
   maxSlots: z.number().int().positive().optional().nullable(),
   order: z.number().int().min(0).optional(),
   active: z.boolean().optional(),

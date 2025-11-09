@@ -18,6 +18,7 @@ const modalitySchema = z.object({
   name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres'),
   description: z.string().optional(),
   price: z.number().min(0, 'Preço deve ser maior ou igual a 0'),
+  isFree: z.boolean().optional(),
   maxSlots: z.preprocess(
     (val) => {
       if (val === '' || val === null || val === undefined) return undefined;
@@ -54,6 +55,7 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [priceValue, setPriceValue] = useState(0);
+  const [isFree, setIsFree] = useState(false);
 
   const {
     register,
@@ -103,9 +105,11 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
       const method = editingId ? 'PATCH' : 'POST';
 
       // Converter preço de centavos para reais antes de enviar
+      // Se for gratuita, setar preço como 0
+      const { isFree: _, ...dataWithoutIsFree } = data;
       const payload = {
-        ...data,
-        price: data.price / 100,
+        ...dataWithoutIsFree,
+        price: isFree ? 0 : data.price / 100,
       };
 
       const response = await fetch(url, {
@@ -129,6 +133,7 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
       // Resetar form
       reset({ active: true, price: 0 });
       setPriceValue(0);
+      setIsFree(false);
       setShowForm(false);
       setEditingId(null);
     } catch (err) {
@@ -145,6 +150,7 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
     const priceInCents = modality.price * 100; // Converter para centavos
     setValue('price', priceInCents);
     setPriceValue(priceInCents);
+    setIsFree(modality.price === 0);
     setValue('maxSlots', modality.maxSlots || undefined);
     setValue('active', modality.active);
     setShowForm(true);
@@ -178,6 +184,7 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
   const handleCancel = () => {
     reset({ active: true, price: 0 });
     setPriceValue(0);
+    setIsFree(false);
     setShowForm(false);
     setEditingId(null);
   };
@@ -230,9 +237,29 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
                       setPriceValue(value);
                       setValue('price', value);
                     }}
-                    disabled={isLoading}
+                    disabled={isLoading || isFree}
                   />
                   {errors.price && <p className="text-sm text-red-600">{errors.price.message}</p>}
+
+                  <div className="flex items-center gap-2 mt-2">
+                    <input
+                      type="checkbox"
+                      id="isFree"
+                      checked={isFree}
+                      onChange={(e) => {
+                        setIsFree(e.target.checked);
+                        if (e.target.checked) {
+                          setPriceValue(0);
+                          setValue('price', 0);
+                        }
+                      }}
+                      disabled={isLoading}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <Label htmlFor="isFree" className="cursor-pointer font-normal">
+                      Inscrição gratuita
+                    </Label>
+                  </div>
                 </div>
               </div>
 
@@ -317,9 +344,16 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <CardTitle className="text-lg">{modality.name}</CardTitle>
-                  <Badge variant={modality.active ? 'default' : 'secondary'}>
-                    {modality.active ? 'Ativa' : 'Inativa'}
-                  </Badge>
+                  <div className="flex gap-2">
+                    {modality.price === 0 && (
+                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                        Gratuita
+                      </Badge>
+                    )}
+                    <Badge variant={modality.active ? 'default' : 'secondary'}>
+                      {modality.active ? 'Ativa' : 'Inativa'}
+                    </Badge>
+                  </div>
                 </div>
                 {modality.description && (
                   <CardDescription className="line-clamp-2">{modality.description}</CardDescription>
@@ -330,7 +364,7 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
                   <div className="flex items-center gap-2 text-sm">
                     <Ticket className="h-4 w-4 text-[hsl(var(--gray-600))]" />
                     <span className="font-semibold">
-                      {new Intl.NumberFormat('pt-BR', {
+                      {modality.price === 0 ? 'Gratuita' : new Intl.NumberFormat('pt-BR', {
                         style: 'currency',
                         currency: 'BRL',
                       }).format(modality.price)}

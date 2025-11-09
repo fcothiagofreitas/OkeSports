@@ -10,11 +10,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { useAuthStore } from '@/stores/authStore';
 import { apiPost } from '@/lib/api';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Calendar, MapPin } from 'lucide-react';
 import { DashboardNav } from '@/components/layout/DashboardNav';
+import { ModalityManager } from '@/components/features/events/ModalityManager';
 
 const STORAGE_KEY = 'event-draft-form';
 
@@ -32,13 +33,16 @@ const eventSchema = z.object({
 });
 
 type EventFormData = z.infer<typeof eventSchema>;
+type TabType = 'info' | 'modalities' | 'batches' | 'coupons';
 
 export default function NewEventPage() {
   const router = useRouter();
-  const { accessToken, logout } = useAuthStore();
+  const { accessToken } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasDraft, setHasDraft] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('info');
+  const [createdEventId, setCreatedEventId] = useState<string | null>(null);
 
   const {
     register,
@@ -76,13 +80,12 @@ export default function NewEventPage() {
     return () => subscription.unsubscribe();
   }, [watch]);
 
-  const onSubmit = async (data: EventFormData) => {
+  const onSubmitBasicInfo = async (data: EventFormData) => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // Preparar dados com location nested
-      // Converter datas para ISO datetime (adicionar hora)
+      // Converter datas para ISO datetime
       const eventDateISO = new Date(data.eventDate + 'T08:00:00').toISOString();
       const regStartISO = new Date(data.registrationStart + 'T00:00:00').toISOString();
       const regEndISO = new Date(data.registrationEnd + 'T23:59:59').toISOString();
@@ -105,25 +108,19 @@ export default function NewEventPage() {
         },
       };
 
-      console.log('📤 Enviando dados:', requestData);
       const result = await apiPost('/api/events', requestData);
 
       // Limpar rascunho do localStorage após sucesso
       localStorage.removeItem(STORAGE_KEY);
 
-      // Redirecionar para edição do evento
-      router.push(`/dashboard/events/${result.id}/edit`);
+      // Salvar ID do evento criado e ir para próxima aba
+      setCreatedEventId(result.id);
+      setActiveTab('modalities');
     } catch (err: any) {
       console.error('❌ Erro completo:', err);
-      console.error('📋 err.data:', err.data);
-      console.error('💬 err.message:', err.message);
-      console.error('🔢 err.status:', err.status);
 
-      // Se token expirado, apiPost já redirecionou para login
       if (err.status !== 401) {
-        // Mostrar detalhes do erro de validação se houver
         if (err.data?.details) {
-          console.error('🔍 Detalhes de validação:', err.data.details);
           const validationErrors = err.data.details.map((e: any) => `${e.path?.join('.')}: ${e.message}`).join(' | ');
           setError(`Dados inválidos: ${validationErrors}`);
         } else {
@@ -143,6 +140,12 @@ export default function NewEventPage() {
     }
   };
 
+  const handleFinish = () => {
+    if (createdEventId) {
+      router.push(`/dashboard/events/${createdEventId}/edit`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[hsl(var(--gray-100))]">
       <DashboardNav />
@@ -159,41 +162,73 @@ export default function NewEventPage() {
           </Link>
           <h1 className="text-4xl font-bold text-[hsl(var(--dark))] font-sans">Novo Evento</h1>
           <p className="text-lg text-[hsl(var(--gray-600))] mt-2">
-            Preencha os dados básicos do seu evento esportivo
+            Siga as etapas para criar seu evento esportivo
           </p>
         </div>
       </div>
 
-      {/* Form */}
+      {/* Tabs de Navegação - Sticky */}
+      <div className="bg-white border-b border-[hsl(var(--gray-200))] sticky top-0 z-40 shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 lg:px-10">
+          <div className="flex gap-1">
+            <button
+              onClick={() => setActiveTab('info')}
+              disabled={true}
+              className={`px-6 py-3 font-medium text-sm transition-colors ${
+                activeTab === 'info'
+                  ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
+                  : 'text-[hsl(var(--gray-400))] cursor-not-allowed'
+              }`}
+            >
+              Informações Básicas
+            </button>
+            <button
+              onClick={() => createdEventId && setActiveTab('modalities')}
+              disabled={!createdEventId}
+              className={`px-6 py-3 font-medium text-sm transition-colors ${
+                activeTab === 'modalities'
+                  ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
+                  : createdEventId
+                  ? 'text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
+                  : 'text-[hsl(var(--gray-400))] cursor-not-allowed'
+              }`}
+            >
+              Modalidades
+            </button>
+            <button
+              disabled
+              className="px-6 py-3 font-medium text-sm text-[hsl(var(--gray-400))] cursor-not-allowed"
+            >
+              Lotes
+            </button>
+            <button
+              disabled
+              className="px-6 py-3 font-medium text-sm text-[hsl(var(--gray-400))] cursor-not-allowed"
+            >
+              Cupons
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
       <main className="max-w-7xl mx-auto px-6 lg:px-10 py-12">
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-start">
-              <div>
-                <CardTitle>Informações Básicas</CardTitle>
-                <CardDescription>
-                  Você poderá adicionar modalidades e lotes na próxima etapa
-                </CardDescription>
-              </div>
+        {/* Etapa 1: Informações Básicas */}
+        {activeTab === 'info' && (
+          <Card className="p-6">
+            <form onSubmit={handleSubmit(onSubmitBasicInfo)} className="space-y-6">
               {hasDraft && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearDraft}
-                  className="text-xs"
-                >
-                  Limpar rascunho
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-              {hasDraft && (
-                <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-800 border border-blue-200">
-                  ℹ️ Rascunho restaurado automaticamente. Seus dados estão sendo salvos enquanto você
-                  digita.
+                <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-800 border border-blue-200 flex items-center justify-between">
+                  <span>ℹ️ Rascunho restaurado automaticamente.</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearDraft}
+                    className="text-xs h-auto py-1"
+                  >
+                    Limpar
+                  </Button>
                 </div>
               )}
 
@@ -229,50 +264,59 @@ export default function NewEventPage() {
               </div>
 
               {/* Data do Evento */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="eventDate">Data do Evento *</Label>
-                  <Input
-                    id="eventDate"
-                    type="date"
-                    {...register('eventDate')}
-                    disabled={isLoading}
-                  />
-                  {errors.eventDate && (
-                    <p className="text-sm text-red-600">{errors.eventDate.message}</p>
-                  )}
-                </div>
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-[hsl(var(--dark))] flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Datas
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="eventDate">Data do Evento *</Label>
+                    <Input
+                      id="eventDate"
+                      type="date"
+                      {...register('eventDate')}
+                      disabled={isLoading}
+                    />
+                    {errors.eventDate && (
+                      <p className="text-sm text-red-600">{errors.eventDate.message}</p>
+                    )}
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="registrationStart">Início Inscrições *</Label>
-                  <Input
-                    id="registrationStart"
-                    type="date"
-                    {...register('registrationStart')}
-                    disabled={isLoading}
-                  />
-                  {errors.registrationStart && (
-                    <p className="text-sm text-red-600">{errors.registrationStart.message}</p>
-                  )}
-                </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="registrationStart">Início Inscrições *</Label>
+                    <Input
+                      id="registrationStart"
+                      type="date"
+                      {...register('registrationStart')}
+                      disabled={isLoading}
+                    />
+                    {errors.registrationStart && (
+                      <p className="text-sm text-red-600">{errors.registrationStart.message}</p>
+                    )}
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="registrationEnd">Fim Inscrições *</Label>
-                  <Input
-                    id="registrationEnd"
-                    type="date"
-                    {...register('registrationEnd')}
-                    disabled={isLoading}
-                  />
-                  {errors.registrationEnd && (
-                    <p className="text-sm text-red-600">{errors.registrationEnd.message}</p>
-                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="registrationEnd">Fim Inscrições *</Label>
+                    <Input
+                      id="registrationEnd"
+                      type="date"
+                      {...register('registrationEnd')}
+                      disabled={isLoading}
+                    />
+                    {errors.registrationEnd && (
+                      <p className="text-sm text-red-600">{errors.registrationEnd.message}</p>
+                    )}
+                  </div>
                 </div>
               </div>
 
               {/* Localização */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-[hsl(var(--dark))]">Localização</h3>
+                <h3 className="text-lg font-semibold text-[hsl(var(--dark))] flex items-center gap-2">
+                  <MapPin className="h-5 w-5" />
+                  Localização
+                </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2 md:col-span-2">
@@ -322,18 +366,45 @@ export default function NewEventPage() {
 
               {/* Ações */}
               <div className="flex gap-4 pt-6">
-                <Button type="submit" disabled={isLoading} className="flex-1">
-                  {isLoading ? 'Criando...' : 'Criar Evento'}
-                </Button>
                 <Link href="/dashboard/events" className="flex-1">
                   <Button type="button" variant="outline" disabled={isLoading} className="w-full">
                     Cancelar
                   </Button>
                 </Link>
+                <Button type="submit" disabled={isLoading} className="flex-1 gap-2">
+                  {isLoading ? 'Salvando...' : 'Próximo'}
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
               </div>
             </form>
-          </CardContent>
-        </Card>
+          </Card>
+        )}
+
+        {/* Etapa 2: Modalidades */}
+        {activeTab === 'modalities' && createdEventId && (
+          <Card className="p-6">
+            <ModalityManager eventId={createdEventId} />
+
+            <div className="flex gap-4 pt-6 mt-6 border-t border-[hsl(var(--gray-200))]">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setActiveTab('info')}
+                className="flex-1 gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Voltar
+              </Button>
+              <Button
+                type="button"
+                onClick={handleFinish}
+                className="flex-1"
+              >
+                Finalizar
+              </Button>
+            </div>
+          </Card>
+        )}
       </main>
     </div>
   );
