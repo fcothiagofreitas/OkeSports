@@ -276,8 +276,7 @@ export default function EditEventPage() {
 
       {/* Form */}
       <main className="max-w-6xl mx-auto px-6 lg:px-10 py-8 pb-12">
-        <div>
-            <Card>
+        <Card>
               <CardHeader>
                 <CardTitle>Informações Básicas</CardTitle>
                 <CardDescription>Edite os dados principais do seu evento</CardDescription>
@@ -416,8 +415,6 @@ export default function EditEventPage() {
                 </form>
               </CardContent>
             </Card>
-          </div>
-        </div>
       </main>
     </div>
   );
