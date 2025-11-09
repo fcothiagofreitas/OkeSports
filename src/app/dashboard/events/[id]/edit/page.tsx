@@ -16,6 +16,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { ArrowLeft, Calendar, Users } from 'lucide-react';
 import { apiGet, apiPatch, ApiError } from '@/lib/api';
 import { DashboardNav } from '@/components/layout/DashboardNav';
+import { ModalityManager } from '@/components/features/events/ModalityManager';
 
 const eventSchema = z.object({
   name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
@@ -58,6 +59,8 @@ interface Event {
   };
 }
 
+type TabType = 'info' | 'modalities' | 'batches' | 'coupons';
+
 export default function EditEventPage() {
   const router = useRouter();
   const params = useParams();
@@ -66,6 +69,7 @@ export default function EditEventPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>('info');
 
   const {
     register,
@@ -256,14 +260,26 @@ export default function EditEventPage() {
 
           {/* Tabs de Navegação */}
           <div className="flex gap-1 mt-8 border-b border-[hsl(var(--gray-200))]">
-            <button className="px-6 py-3 font-medium text-sm border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))] cursor-default">
+            <button
+              onClick={() => setActiveTab('info')}
+              className={`px-6 py-3 font-medium text-sm transition-colors ${
+                activeTab === 'info'
+                  ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
+                  : 'text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
+              }`}
+            >
               Informações Básicas
             </button>
-            <Link href={`/dashboard/events/${params.id}/modalities`}>
-              <button className="px-6 py-3 font-medium text-sm text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer transition-colors">
-                Modalidades ({event?._count.modalities || 0})
-              </button>
-            </Link>
+            <button
+              onClick={() => setActiveTab('modalities')}
+              className={`px-6 py-3 font-medium text-sm transition-colors ${
+                activeTab === 'modalities'
+                  ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
+                  : 'text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
+              }`}
+            >
+              Modalidades ({event?._count.modalities || 0})
+            </button>
             <button className="px-6 py-3 font-medium text-sm text-[hsl(var(--gray-400))] cursor-not-allowed">
               Lotes (Em breve)
             </button>
@@ -274,14 +290,16 @@ export default function EditEventPage() {
         </div>
       </div>
 
-      {/* Form */}
+      {/* Content */}
       <main className="max-w-7xl mx-auto px-6 lg:px-10 py-12">
-        <Card>
-              <CardHeader>
-                <CardTitle>Informações Básicas</CardTitle>
-                <CardDescription>Edite os dados principais do seu evento</CardDescription>
-              </CardHeader>
-              <CardContent>
+        {/* Tab: Informações Básicas */}
+        {activeTab === 'info' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Informações Básicas</CardTitle>
+              <CardDescription>Edite os dados principais do seu evento</CardDescription>
+            </CardHeader>
+            <CardContent>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                   {error && (
                     <div className="rounded-md bg-red-50 p-4 text-sm text-red-800">{error}</div>
@@ -413,8 +431,30 @@ export default function EditEventPage() {
                     </Button>
                   </div>
                 </form>
-              </CardContent>
-            </Card>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Tab: Modalidades */}
+        {activeTab === 'modalities' && (
+          <Card className="p-6">
+            <ModalityManager eventId={params.id as string} />
+          </Card>
+        )}
+
+        {/* Tab: Lotes (Em breve) */}
+        {activeTab === 'batches' && (
+          <Card className="p-12 text-center">
+            <p className="text-[hsl(var(--gray-600))]">Em breve...</p>
+          </Card>
+        )}
+
+        {/* Tab: Cupons (Em breve) */}
+        {activeTab === 'coupons' && (
+          <Card className="p-12 text-center">
+            <p className="text-[hsl(var(--gray-600))]">Em breve...</p>
+          </Card>
+        )}
       </main>
     </div>
   );
