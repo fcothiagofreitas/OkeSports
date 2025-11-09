@@ -10,8 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { useAuthStore } from '@/stores/authStore';
-import { Plus, Edit, Trash2, Users, DollarSign } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, DollarSign, Ticket } from 'lucide-react';
 
 const modalitySchema = z.object({
   name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres'),
@@ -45,6 +46,7 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [priceValue, setPriceValue] = useState(0);
 
   const {
     register,
@@ -52,10 +54,12 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
     formState: { errors },
     reset,
     setValue,
+    watch,
   } = useForm<ModalityFormData>({
     resolver: zodResolver(modalitySchema),
     defaultValues: {
       active: true,
+      price: 0,
     },
   });
 
@@ -91,13 +95,19 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
 
       const method = editingId ? 'PATCH' : 'POST';
 
+      // Converter preço de centavos para reais antes de enviar
+      const payload = {
+        ...data,
+        price: data.price / 100,
+      };
+
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
@@ -110,7 +120,8 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
       await fetchModalities();
 
       // Resetar form
-      reset({ active: true });
+      reset({ active: true, price: 0 });
+      setPriceValue(0);
       setShowForm(false);
       setEditingId(null);
     } catch (err) {
@@ -124,7 +135,9 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
     setEditingId(modality.id);
     setValue('name', modality.name);
     setValue('description', modality.description || '');
-    setValue('price', modality.price);
+    const priceInCents = modality.price * 100; // Converter para centavos
+    setValue('price', priceInCents);
+    setPriceValue(priceInCents);
     setValue('maxSlots', modality.maxSlots || undefined);
     setValue('active', modality.active);
     setShowForm(true);
@@ -156,7 +169,8 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
   };
 
   const handleCancel = () => {
-    reset({ active: true });
+    reset({ active: true, price: 0 });
+    setPriceValue(0);
     setShowForm(false);
     setEditingId(null);
   };
@@ -200,13 +214,15 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="price">Preço (R$) *</Label>
-                  <Input
+                  <Label htmlFor="price">Preço *</Label>
+                  <CurrencyInput
                     id="price"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    {...register('price', { valueAsNumber: true })}
+                    placeholder="R$ 0,00"
+                    value={priceValue}
+                    onValueChange={(value) => {
+                      setPriceValue(value);
+                      setValue('price', value);
+                    }}
                     disabled={isLoading}
                   />
                   {errors.price && <p className="text-sm text-red-600">{errors.price.message}</p>}
@@ -305,12 +321,12 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
               <CardContent>
                 <div className="space-y-3 mb-4">
                   <div className="flex items-center gap-2 text-sm">
-                    <DollarSign className="h-4 w-4 text-[hsl(var(--gray-600))]" />
+                    <Ticket className="h-4 w-4 text-[hsl(var(--gray-600))]" />
                     <span className="font-semibold">
-                      {modality.price.toLocaleString('pt-BR', {
+                      {new Intl.NumberFormat('pt-BR', {
                         style: 'currency',
                         currency: 'BRL',
-                      })}
+                      }).format(modality.price)}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-[hsl(var(--gray-600))]">

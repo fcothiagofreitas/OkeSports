@@ -220,7 +220,7 @@ export default function EditEventPage() {
       <DashboardNav />
 
       {/* Header */}
-      <div className="bg-white border-b border-[hsl(var(--gray-200))]">
+      <div className="bg-white border-[hsl(var(--gray-200))]">
         <div className="max-w-7xl mx-auto px-6 lg:px-10 py-8">
           <Link
             href="/dashboard/events"
@@ -261,7 +261,7 @@ export default function EditEventPage() {
       </div>
 
       {/* Tabs de Navegação - Sticky */}
-      <div className="bg-white border-b border-[hsl(var(--gray-200))] sticky top-0 z-40 shadow-sm">
+      <div className="bg-white border-b sticky top-0 z-40 ">
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
           <div className="flex gap-1">
             <button
