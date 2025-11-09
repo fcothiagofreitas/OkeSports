@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthStore } from '@/stores/authStore';
+import { DashboardNav } from '@/components/layout/DashboardNav';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -62,22 +63,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[hsl(var(--gray-100))]">
-      {/* Navbar com estilo Dribbble */}
-      <nav className="bg-white border-b border-[hsl(var(--gray-200))] backdrop-blur-sm bg-white/90 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10">
-          <div className="flex justify-between h-20">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-[hsl(var(--accent-pink))] font-sans">🏃 Okê Sports</h1>
-            </div>
-            <div className="flex items-center space-x-6">
-              <span className="text-sm font-medium text-[hsl(var(--gray-600))]">{user.email}</span>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                Sair
-              </Button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <DashboardNav />
 
       {/* Main Content com espaçamento Dribbble */}
       <main className="max-w-7xl mx-auto px-6 lg:px-10 py-12">

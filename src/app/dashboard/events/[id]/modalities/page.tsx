@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { useAuthStore } from '@/stores/authStore';
 import { ArrowLeft } from 'lucide-react';
 import { ModalityManager } from '@/components/features/events/ModalityManager';
+import { DashboardNav } from '@/components/layout/DashboardNav';
 
 interface Event {
   id: string;
@@ -55,6 +56,8 @@ export default function EventModalitiesPage() {
 
   return (
     <div className="min-h-screen bg-[hsl(var(--gray-100))]">
+      <DashboardNav />
+
       {/* Header */}
       <div className="bg-white border-b border-[hsl(var(--gray-200))]">
         <div className="max-w-6xl mx-auto px-6 lg:px-10 py-8">

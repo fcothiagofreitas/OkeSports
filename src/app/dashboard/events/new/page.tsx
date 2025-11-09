@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuthStore } from '@/stores/authStore';
 import { apiPost } from '@/lib/api';
 import { ArrowLeft } from 'lucide-react';
+import { DashboardNav } from '@/components/layout/DashboardNav';
 
 const STORAGE_KEY = 'event-draft-form';
 
@@ -144,6 +145,8 @@ export default function NewEventPage() {
 
   return (
     <div className="min-h-screen bg-[hsl(var(--gray-100))]">
+      <DashboardNav />
+
       {/* Header */}
       <div className="bg-white border-b border-[hsl(var(--gray-200))]">
         <div className="max-w-4xl mx-auto px-6 lg:px-10 py-8">

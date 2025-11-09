@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/stores/authStore';
 import { apiGet, apiDelete, ApiError } from '@/lib/api';
 import { Calendar, MapPin, Users, Plus, Edit, Trash2 } from 'lucide-react';
+import { DashboardNav } from '@/components/layout/DashboardNav';
 
 interface Event {
   id: string;
@@ -85,6 +86,8 @@ export default function EventsPage() {
 
   return (
     <div className="min-h-screen bg-[hsl(var(--gray-100))]">
+      <DashboardNav />
+
       {/* Header */}
       <div className="bg-white border-b border-[hsl(var(--gray-200))]">
         <div className="max-w-7xl mx-auto px-6 lg:px-10 py-8">

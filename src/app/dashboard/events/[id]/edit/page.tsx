@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/stores/authStore';
 import { ArrowLeft, Calendar, Users } from 'lucide-react';
 import { apiGet, apiPatch, ApiError } from '@/lib/api';
+import { DashboardNav } from '@/components/layout/DashboardNav';
 
 const eventSchema = z.object({
   name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
@@ -212,6 +213,8 @@ export default function EditEventPage() {
 
   return (
     <div className="min-h-screen bg-[hsl(var(--gray-100))]">
+      <DashboardNav />
+
       {/* Header */}
       <div className="bg-white border-b border-[hsl(var(--gray-200))]">
         <div className="max-w-6xl mx-auto px-6 lg:px-10 py-8">
