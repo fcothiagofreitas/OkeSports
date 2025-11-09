@@ -12,8 +12,8 @@ const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET!;
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY!;
 
 // Token expiration times
-const ACCESS_TOKEN_EXPIRES_IN = '15m'; // 15 minutes
-const REFRESH_TOKEN_EXPIRES_IN = '7d'; // 7 days
+const ACCESS_TOKEN_EXPIRES_IN = '30d'; // 30 dias (desabilitado expiração curta)
+const REFRESH_TOKEN_EXPIRES_IN = '90d'; // 90 dias
 
 // Encryption algorithm
 const ALGORITHM = 'aes-256-gcm';
