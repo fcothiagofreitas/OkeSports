@@ -81,22 +81,30 @@ export default function NewEventPage() {
       setError(null);
 
       // Preparar dados com location nested
+      // Converter datas para ISO datetime (adicionar hora)
+      const eventDateISO = new Date(data.eventDate + 'T08:00:00').toISOString();
+      const regStartISO = new Date(data.registrationStart + 'T00:00:00').toISOString();
+      const regEndISO = new Date(data.registrationEnd + 'T23:59:59').toISOString();
+
       const requestData = {
         name: data.name,
         description: data.description,
         shortDescription: data.shortDescription || data.description.substring(0, 100),
-        eventDate: data.eventDate,
-        registrationStart: data.registrationStart,
-        registrationEnd: data.registrationEnd,
-        status: 'DRAFT',
+        eventDate: eventDateISO,
+        registrationStart: regStartISO,
+        registrationEnd: regEndISO,
+        status: 'DRAFT' as const,
         location: {
+          street: data.address || 'Não informado',
+          number: 'S/N',
+          neighborhood: 'Centro',
           city: data.city,
           state: data.state.toUpperCase(),
-          address: data.address || '',
-          zipCode: data.zipCode || '',
+          cep: data.zipCode || '00000-000',
         },
       };
 
+      console.log('📤 Enviando dados:', requestData);
       const result = await apiPost('/api/events', requestData);
 
       // Limpar rascunho do localStorage após sucesso
@@ -105,13 +113,17 @@ export default function NewEventPage() {
       // Redirecionar para edição do evento
       router.push(`/dashboard/events/${result.id}/edit`);
     } catch (err: any) {
-      console.error('Erro ao criar evento:', err);
+      console.error('❌ Erro completo:', err);
+      console.error('📋 err.data:', err.data);
+      console.error('💬 err.message:', err.message);
+      console.error('🔢 err.status:', err.status);
 
       // Se token expirado, apiPost já redirecionou para login
       if (err.status !== 401) {
         // Mostrar detalhes do erro de validação se houver
         if (err.data?.details) {
-          const validationErrors = err.data.details.map((e: any) => e.message).join(', ');
+          console.error('🔍 Detalhes de validação:', err.data.details);
+          const validationErrors = err.data.details.map((e: any) => `${e.path?.join('.')}: ${e.message}`).join(' | ');
           setError(`Dados inválidos: ${validationErrors}`);
         } else {
           setError(err.message || 'Erro ao criar evento');
