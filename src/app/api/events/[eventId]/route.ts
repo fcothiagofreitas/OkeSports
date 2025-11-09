@@ -25,17 +25,10 @@ async function getEvent(
         modalities: {
           orderBy: { price: 'asc' },
         },
-        batches: {
-          orderBy: { startDate: 'asc' },
-        },
-        coupons: {
-          where: {
-            isActive: true,
-          },
-        },
         _count: {
           select: {
             registrations: true,
+            modalities: true,
           },
         },
       },
@@ -56,6 +49,7 @@ async function getEvent(
     return NextResponse.json(event);
   } catch (error) {
     console.error('Get event error:', error);
+    console.error('Error details:', JSON.stringify(error, null, 2));
     return NextResponse.json({ error: 'Erro ao buscar evento' }, { status: 500 });
   }
 }

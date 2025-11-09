@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/stores/authStore';
 import { ArrowLeft, Calendar, Users } from 'lucide-react';
+import { apiGet, apiPatch, ApiError } from '@/lib/api';
 
 const eventSchema = z.object({
   name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
@@ -41,10 +42,14 @@ interface Event {
   registrationEnd: string;
   status: 'DRAFT' | 'PUBLISHED' | 'CANCELLED';
   location?: {
+    venueName?: string;
+    street: string;
+    number: string;
+    complement?: string;
+    neighborhood: string;
     city: string;
     state: string;
-    address?: string;
-    zipCode?: string;
+    cep: string;
   };
   _count: {
     modalities: number;
@@ -77,37 +82,30 @@ export default function EditEventPage() {
   const fetchEvent = async () => {
     try {
       setIsFetching(true);
-      const response = await fetch(`/api/events/${params.id}`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+      const data = await apiGet<Event>(`/api/events/${params.id}`);
+
+      setEvent(data);
+      // Preencher form com dados do evento
+      reset({
+        name: data.name,
+        description: data.description,
+        shortDescription: data.shortDescription || '',
+        eventDate: data.eventDate.split('T')[0],
+        registrationStart: data.registrationStart.split('T')[0],
+        registrationEnd: data.registrationEnd.split('T')[0],
+        status: data.status,
+        city: data.location?.city || '',
+        state: data.location?.state || '',
+        address: data.location?.street || '',
+        zipCode: data.location?.cep || '',
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setEvent(data);
-        // Preencher form com dados do evento
-        reset({
-          name: data.name,
-          description: data.description,
-          shortDescription: data.shortDescription || '',
-          eventDate: data.eventDate.split('T')[0],
-          registrationStart: data.registrationStart.split('T')[0],
-          registrationEnd: data.registrationEnd.split('T')[0],
-          status: data.status,
-          city: data.location?.city || '',
-          state: data.location?.state || '',
-          address: data.location?.address || '',
-          zipCode: data.location?.zipCode || '',
-        });
-      } else {
-        console.error('Erro ao buscar evento:', data.error);
-        setError(data.error || 'Erro ao buscar evento');
-      }
     } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        // apiGet já redireciona para login
+        return;
+      }
       console.error('Erro ao buscar evento:', error);
-      setError('Erro ao buscar evento');
+      setError(error instanceof ApiError ? error.message : 'Erro ao buscar evento');
     } finally {
       setIsFetching(false);
     }
@@ -118,7 +116,7 @@ export default function EditEventPage() {
       setIsLoading(true);
       setError(null);
 
-      // Preparar dados com location nested
+      // Preparar dados com location nested - Schema correto do banco
       const requestData = {
         name: data.name,
         description: data.description,
@@ -128,33 +126,26 @@ export default function EditEventPage() {
         registrationEnd: data.registrationEnd,
         status: data.status,
         location: {
+          street: data.address || 'Não informado',
+          number: 'S/N',
+          neighborhood: 'Centro',
           city: data.city,
           state: data.state.toUpperCase(),
-          address: data.address || '',
-          zipCode: data.zipCode || '',
+          cep: data.zipCode || '00000-000',
         },
       };
 
-      const response = await fetch(`/api/events/${params.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify(requestData),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Erro ao atualizar evento');
-      }
+      const result = await apiPatch<Event>(`/api/events/${params.id}`, requestData);
 
       // Atualizar evento local
       setEvent(result);
       alert('Evento atualizado com sucesso!');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido');
+      if (err instanceof ApiError && err.status === 401) {
+        // apiPatch já redireciona para login
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : 'Erro desconhecido');
     } finally {
       setIsLoading(false);
     }
@@ -167,26 +158,18 @@ export default function EditEventPage() {
 
     try {
       setIsLoading(true);
-      const response = await fetch(`/api/events/${params.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ status: 'PUBLISHED' }),
+      const result = await apiPatch<Event>(`/api/events/${params.id}`, {
+        status: 'PUBLISHED',
       });
 
-      const result = await response.json();
-
-      if (response.ok) {
-        setEvent(result);
-        alert('Evento publicado com sucesso!');
-      } else {
-        alert(result.error || 'Erro ao publicar evento');
-      }
+      setEvent(result);
+      alert('Evento publicado com sucesso!');
     } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        return;
+      }
       console.error('Erro ao publicar evento:', error);
-      alert('Erro ao publicar evento');
+      alert(error instanceof ApiError ? error.message : 'Erro ao publicar evento');
     } finally {
       setIsLoading(false);
     }
