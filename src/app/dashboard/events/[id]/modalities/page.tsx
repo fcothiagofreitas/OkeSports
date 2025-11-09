@@ -68,13 +68,33 @@ export default function EventModalitiesPage() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar para evento
           </Link>
-          <h1 className="text-4xl font-bold text-[hsl(var(--dark))] font-sans">Modalidades</h1>
+          <h1 className="text-4xl font-bold text-[hsl(var(--dark))] font-sans">
+            Editar Evento
+          </h1>
           <p className="text-lg text-[hsl(var(--gray-600))] mt-2">{event?.name}</p>
+
+          {/* Tabs de Navegação */}
+          <div className="flex gap-1 mt-8 border-b border-[hsl(var(--gray-200))]">
+            <Link href={`/dashboard/events/${params.id}/edit`}>
+              <button className="px-6 py-3 font-medium text-sm text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer transition-colors">
+                Informações Básicas
+              </button>
+            </Link>
+            <button className="px-6 py-3 font-medium text-sm border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))] cursor-default">
+              Modalidades
+            </button>
+            <button className="px-6 py-3 font-medium text-sm text-[hsl(var(--gray-400))] cursor-not-allowed">
+              Lotes (Em breve)
+            </button>
+            <button className="px-6 py-3 font-medium text-sm text-[hsl(var(--gray-400))] cursor-not-allowed">
+              Cupons (Em breve)
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Content */}
-      <main className="max-w-6xl mx-auto px-6 lg:px-10 py-12">
+      <main className="max-w-6xl mx-auto px-6 lg:px-10 py-8 pb-12">
         <Card className="p-6">
           <ModalityManager eventId={params.id as string} />
         </Card>

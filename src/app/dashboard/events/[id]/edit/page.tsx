@@ -253,41 +253,30 @@ export default function EditEventPage() {
               {event?._count.registrations} inscrições • {event?._count.modalities} modalidades
             </div>
           </div>
+
+          {/* Tabs de Navegação */}
+          <div className="flex gap-1 mt-8 border-b border-[hsl(var(--gray-200))]">
+            <button className="px-6 py-3 font-medium text-sm border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))] cursor-default">
+              Informações Básicas
+            </button>
+            <Link href={`/dashboard/events/${params.id}/modalities`}>
+              <button className="px-6 py-3 font-medium text-sm text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer transition-colors">
+                Modalidades ({event?._count.modalities || 0})
+              </button>
+            </Link>
+            <button className="px-6 py-3 font-medium text-sm text-[hsl(var(--gray-400))] cursor-not-allowed">
+              Lotes (Em breve)
+            </button>
+            <button className="px-6 py-3 font-medium text-sm text-[hsl(var(--gray-400))] cursor-not-allowed">
+              Cupons (Em breve)
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Form */}
-      <main className="max-w-6xl mx-auto px-6 lg:px-10 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Sidebar - Menu */}
-          <div className="lg:col-span-1">
-            <Card>
-              <CardHeader>
-                <CardTitle>Seções</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <nav className="space-y-2">
-                  <button className="w-full text-left px-4 py-2 rounded-lg bg-[hsl(var(--gray-100))] font-medium">
-                    Informações Básicas
-                  </button>
-                  <Link href={`/dashboard/events/${params.id}/modalities`}>
-                    <button className="w-full text-left px-4 py-2 rounded-lg text-[hsl(var(--gray-600))] hover:bg-[hsl(var(--gray-100))] cursor-pointer">
-                      Modalidades ({event?._count.modalities || 0})
-                    </button>
-                  </Link>
-                  <button className="w-full text-left px-4 py-2 rounded-lg text-[hsl(var(--gray-600))] hover:bg-[hsl(var(--gray-100))] opacity-50 cursor-not-allowed">
-                    Lotes (Em breve)
-                  </button>
-                  <button className="w-full text-left px-4 py-2 rounded-lg text-[hsl(var(--gray-600))] hover:bg-[hsl(var(--gray-100))] opacity-50 cursor-not-allowed">
-                    Cupons (Em breve)
-                  </button>
-                </nav>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Main Form */}
-          <div className="lg:col-span-2">
+      <main className="max-w-6xl mx-auto px-6 lg:px-10 py-8 pb-12">
+        <div>
             <Card>
               <CardHeader>
                 <CardTitle>Informações Básicas</CardTitle>
