@@ -49,14 +49,6 @@ export default function NewEventPage() {
     resolver: zodResolver(eventSchema),
   });
 
-  // Verificar se tem token válido
-  useEffect(() => {
-    if (!accessToken) {
-      logout();
-      router.push('/login?expired=true');
-    }
-  }, [accessToken, logout, router]);
-
   // Carregar rascunho do localStorage ao montar
   useEffect(() => {
     const savedDraft = localStorage.getItem(STORAGE_KEY);
