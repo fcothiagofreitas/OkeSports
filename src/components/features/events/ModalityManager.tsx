@@ -18,7 +18,14 @@ const modalitySchema = z.object({
   name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres'),
   description: z.string().optional(),
   price: z.number().min(0, 'Preço deve ser maior ou igual a 0'),
-  maxSlots: z.number().int().positive('Vagas deve ser maior que 0').optional(),
+  maxSlots: z.preprocess(
+    (val) => {
+      if (val === '' || val === null || val === undefined) return undefined;
+      const num = Number(val);
+      return isNaN(num) ? undefined : num;
+    },
+    z.number().int().positive('Vagas deve ser maior que 0').optional()
+  ),
   active: z.boolean().optional(),
 });
 
@@ -246,7 +253,7 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
                   id="maxSlots"
                   type="number"
                   placeholder="Deixe vazio para ilimitado"
-                  {...register('maxSlots', { valueAsNumber: true })}
+                  {...register('maxSlots')}
                   disabled={isLoading}
                 />
                 {errors.maxSlots && (
