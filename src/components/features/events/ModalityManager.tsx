@@ -112,6 +112,8 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
         price: isFree ? 0 : data.price / 100,
       };
 
+      console.log('📤 Payload enviado:', payload);
+
       const response = await fetch(url, {
         method,
         headers: {

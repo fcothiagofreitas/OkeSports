@@ -121,14 +121,19 @@ export default function EditEventPage() {
       setIsLoading(true);
       setError(null);
 
+      // Converter datas para ISO datetime
+      const eventDateISO = new Date(data.eventDate + 'T08:00:00').toISOString();
+      const regStartISO = new Date(data.registrationStart + 'T00:00:00').toISOString();
+      const regEndISO = new Date(data.registrationEnd + 'T23:59:59').toISOString();
+
       // Preparar dados com location nested - Schema correto do banco
       const requestData = {
         name: data.name,
         description: data.description,
         shortDescription: data.shortDescription || data.description.substring(0, 100),
-        eventDate: data.eventDate,
-        registrationStart: data.registrationStart,
-        registrationEnd: data.registrationEnd,
+        eventDate: eventDateISO,
+        registrationStart: regStartISO,
+        registrationEnd: regEndISO,
         status: data.status,
         location: {
           street: data.address || 'Não informado',
