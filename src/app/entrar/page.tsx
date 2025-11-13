@@ -89,6 +89,15 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {/* Credenciais de Teste - DEV ONLY */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="rounded-md bg-blue-50 p-3 text-xs border border-blue-200">
+                <p className="font-semibold text-blue-900 mb-1">🔧 Acesso de Teste (DEV):</p>
+                <p className="text-blue-700">Email: maria@okesports.com</p>
+                <p className="text-blue-700">Senha: Senha123</p>
+              </div>
+            )}
+
             {error && (
               <div className="rounded-md bg-red-50 p-3 text-sm text-red-800 border border-red-200">
                 {error}
@@ -101,6 +110,7 @@ export default function LoginPage() {
                 id="email"
                 type="email"
                 placeholder="seu@email.com"
+                defaultValue={process.env.NODE_ENV === 'development' ? 'maria@okesports.com' : ''}
                 {...register('email')}
                 disabled={isLoading}
                 autoFocus
@@ -116,6 +126,7 @@ export default function LoginPage() {
                 id="password"
                 type="password"
                 placeholder="••••••••"
+                defaultValue={process.env.NODE_ENV === 'development' ? 'Senha123' : ''}
                 {...register('password')}
                 disabled={isLoading}
               />
