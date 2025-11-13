@@ -27,7 +27,7 @@ export function RegistrationButton({
 
     // Se não está logado, redireciona para login com redirect
     if (!isAuthenticated) {
-      router.push(`/login?redirect=/e/${eventSlug}`);
+      router.push(`/entrar?redirect=/e/${eventSlug}`);
       return;
     }
 

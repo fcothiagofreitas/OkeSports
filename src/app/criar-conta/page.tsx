@@ -13,14 +13,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useParticipantAuthStore } from '@/stores/participantAuthStore';
 import { ArrowLeft } from 'lucide-react';
 
-const loginSchema = z.object({
+const registerSchema = z.object({
+  fullName: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
   email: z.string().email('Email inválido'),
-  password: z.string().min(1, 'Senha é obrigatória'),
+  cpf: z.string().regex(/^\d{11}$/, 'CPF deve conter 11 dígitos'),
+  phone: z.string().min(10, 'Telefone deve ter no mínimo 10 dígitos'),
+  password: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'As senhas não conferem',
+  path: ['confirmPassword'],
 });
 
-type LoginFormData = z.infer<typeof loginSchema>;
+type RegisterFormData = z.infer<typeof registerSchema>;
 
-export default function LoginPage() {
+export default function CadastroPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect');
@@ -32,30 +39,36 @@ export default function LoginPage() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
+  } = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
   });
 
-  const onSubmit = async (data: LoginFormData) => {
+  const onSubmit = async (data: RegisterFormData) => {
     try {
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch('/api/auth/participant/login', {
+      const response = await fetch('/api/auth/participant/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          fullName: data.fullName,
+          email: data.email,
+          cpf: data.cpf,
+          phone: data.phone,
+          password: data.password,
+        }),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Erro ao fazer login');
+        throw new Error(result.error || 'Erro ao criar conta');
       }
 
-      // Fazer login
+      // Fazer login automaticamente
       login(result.participant, result.accessToken, result.refreshToken);
 
       // Redirecionar
@@ -82,9 +95,9 @@ export default function LoginPage() {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar
           </Link>
-          <CardTitle className="text-2xl">Entrar</CardTitle>
+          <CardTitle className="text-2xl">Criar Conta</CardTitle>
           <CardDescription>
-            Entre com sua conta para se inscrever em eventos
+            Crie sua conta para se inscrever em eventos
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -96,14 +109,26 @@ export default function LoginPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="fullName">Nome Completo *</Label>
+              <Input
+                id="fullName"
+                placeholder="João da Silva"
+                {...register('fullName')}
+                disabled={isLoading}
+              />
+              {errors.fullName && (
+                <p className="text-sm text-red-600">{errors.fullName.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email *</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="seu@email.com"
+                placeholder="joao@example.com"
                 {...register('email')}
                 disabled={isLoading}
-                autoFocus
               />
               {errors.email && (
                 <p className="text-sm text-red-600">{errors.email.message}</p>
@@ -111,7 +136,36 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
+              <Label htmlFor="cpf">CPF *</Label>
+              <Input
+                id="cpf"
+                placeholder="12345678900"
+                maxLength={11}
+                {...register('cpf')}
+                disabled={isLoading}
+              />
+              {errors.cpf && (
+                <p className="text-sm text-red-600">{errors.cpf.message}</p>
+              )}
+              <p className="text-xs text-[hsl(var(--gray-600))]">Apenas números</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">Telefone *</Label>
+              <Input
+                id="phone"
+                placeholder="11999999999"
+                {...register('phone')}
+                disabled={isLoading}
+              />
+              {errors.phone && (
+                <p className="text-sm text-red-600">{errors.phone.message}</p>
+              )}
+              <p className="text-xs text-[hsl(var(--gray-600))]">Com DDD, apenas números</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Senha *</Label>
               <Input
                 id="password"
                 type="password"
@@ -124,17 +178,31 @@ export default function LoginPage() {
               )}
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirmar Senha *</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder="••••••••"
+                {...register('confirmPassword')}
+                disabled={isLoading}
+              />
+              {errors.confirmPassword && (
+                <p className="text-sm text-red-600">{errors.confirmPassword.message}</p>
+              )}
+            </div>
+
             <Button type="submit" disabled={isLoading} className="w-full">
-              {isLoading ? 'Entrando...' : 'Entrar'}
+              {isLoading ? 'Criando conta...' : 'Criar Conta'}
             </Button>
 
             <p className="text-sm text-center text-[hsl(var(--gray-600))]">
-              Não tem uma conta?{' '}
+              Já tem uma conta?{' '}
               <Link
-                href={`/cadastro${redirectTo ? `?redirect=${redirectTo}` : ''}`}
+                href={`/entrar${redirectTo ? `?redirect=${redirectTo}` : ''}`}
                 className="text-[hsl(var(--accent-pink))] hover:underline"
               >
-                Criar conta
+                Entrar
               </Link>
             </p>
           </form>
