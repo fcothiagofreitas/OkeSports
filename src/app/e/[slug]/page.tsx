@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation';
 import { Calendar, MapPin, Users, DollarSign, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { RegistrationButton } from '@/components/events/RegistrationButton';
 
 interface EventPageProps {
   params: Promise<{
@@ -237,16 +237,19 @@ export default async function EventPublicPage({ params }: EventPageProps) {
                       </div>
                     )}
 
-                    <Button
-                      className="w-full"
-                      disabled={!event.isRegistrationOpen || modality.isSoldOut}
-                    >
-                      {modality.isSoldOut
-                        ? 'Esgotado'
-                        : !event.isRegistrationOpen
-                        ? 'Inscrições Encerradas'
-                        : 'Inscrever-se'}
-                    </Button>
+                    <RegistrationButton
+                      eventSlug={event.slug}
+                      modalityId={modality.id}
+                      modalityName={modality.name}
+                      isDisabled={!event.isRegistrationOpen || modality.isSoldOut}
+                      disabledReason={
+                        modality.isSoldOut
+                          ? 'Esgotado'
+                          : !event.isRegistrationOpen
+                          ? 'Inscrições Encerradas'
+                          : undefined
+                      }
+                    />
                   </div>
                 </CardContent>
               </Card>
