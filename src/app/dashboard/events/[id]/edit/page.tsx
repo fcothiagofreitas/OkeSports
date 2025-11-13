@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/stores/authStore';
-import { ArrowLeft, Calendar, Users } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, ExternalLink, Copy, Check } from 'lucide-react';
 import { apiGet, apiPatch, ApiError } from '@/lib/api';
 import { DashboardNav } from '@/components/layout/DashboardNav';
 import { ModalityManager } from '@/components/features/events/ModalityManager';
@@ -70,6 +70,7 @@ export default function EditEventPage() {
   const [isFetching, setIsFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('info');
+  const [copied, setCopied] = useState(false);
 
   const {
     register,
@@ -197,6 +198,20 @@ export default function EditEventPage() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
+  const copyPublicLink = () => {
+    if (!event?.slug) return;
+
+    const publicUrl = `${window.location.origin}/e/${event.slug}`;
+    navigator.clipboard.writeText(publicUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const openPublicPage = () => {
+    if (!event?.slug) return;
+    window.open(`/e/${event.slug}`, '_blank');
+  };
+
   if (isFetching) {
     return (
       <div className="min-h-screen bg-[hsl(var(--gray-100))] flex items-center justify-center">
@@ -262,6 +277,42 @@ export default function EditEventPage() {
               {event?._count.registrations} inscrições • {event?._count.modalities} modalidades
             </div>
           </div>
+
+          {/* Link Público */}
+          {event?.status === 'PUBLISHED' && event?.slug && (
+            <div className="mt-6 p-4 bg-[hsl(var(--gray-50))] rounded-lg border border-[hsl(var(--gray-200))]">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-[hsl(var(--dark))] mb-1">
+                    Link Público do Evento
+                  </p>
+                  <code className="text-sm text-[hsl(var(--gray-600))] break-all">
+                    {typeof window !== 'undefined' && `${window.location.origin}/e/${event.slug}`}
+                  </code>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copyPublicLink}
+                    className="gap-2"
+                  >
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {copied ? 'Copiado!' : 'Copiar'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={openPublicPage}
+                    className="gap-2"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Abrir
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
