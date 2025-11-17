@@ -27,12 +27,12 @@ export function RegistrationButton({
 
     // Se não está logado, redireciona para login com redirect
     if (!isAuthenticated) {
-      router.push(`/entrar?redirect=/e/${eventSlug}`);
+      router.push(`/login?redirect=/e/${eventSlug}/inscricao/${modalityId}`);
       return;
     }
 
-    // TODO: Abrir modal/página de checkout
-    alert(`TODO: Checkout para ${modalityName}`);
+    // Redirecionar para formulário de inscrição
+    router.push(`/e/${eventSlug}/inscricao/${modalityId}`);
   };
 
   return (

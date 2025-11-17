@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     console.error('Mercado Pago OAuth error:', error);
     return NextResponse.redirect(
       new URL(
-        `/dashboard?mp_error=${encodeURIComponent(error)}`,
+        `/app?mp_error=${encodeURIComponent(error)}`,
         process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
       )
     );
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
 
     // 7. Redirecionar para dashboard com sucesso
     return NextResponse.redirect(
-      new URL('/dashboard?mp_connected=true', process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin)
+      new URL('/app?mp_connected=true', process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin)
     );
   } catch (error) {
     console.error('Mercado Pago callback error:', error);
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(
       new URL(
-        `/dashboard?mp_error=${encodeURIComponent(errorMessage)}`,
+        `/app?mp_error=${encodeURIComponent(errorMessage)}`,
         process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
       )
     );

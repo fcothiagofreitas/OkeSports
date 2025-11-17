@@ -226,7 +226,7 @@ export default function EditEventPage() {
         <Card className="w-full max-w-md">
           <CardContent className="py-12 text-center">
             <p className="text-red-600">{error}</p>
-            <Link href="/dashboard/events">
+            <Link href="/app/events">
               <Button className="mt-4">Voltar para eventos</Button>
             </Link>
           </CardContent>
@@ -243,7 +243,7 @@ export default function EditEventPage() {
       <div className="bg-white border-[hsl(var(--gray-200))]">
         <div className="max-w-7xl mx-auto px-6 lg:px-10 py-8">
           <Link
-            href="/dashboard/events"
+            href="/app/events"
             className="inline-flex items-center text-sm text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] mb-4 cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />

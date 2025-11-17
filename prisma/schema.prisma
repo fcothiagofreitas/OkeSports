@@ -325,6 +325,17 @@ model Registration {
   // Número da Inscrição (sequencial por evento)
   registrationNumber Int
 
+  // Dados Adicionais (opcionais)
+  shirtSize        String? // PP, P, M, G, GG, XG
+  emergencyContact String?
+  emergencyPhone   String?
+  medicalInfo      String? @db.Text
+  teamName         String? // Para eventos em equipe
+
+  // Aceites
+  termsAccepted       Boolean @default(false)
+  dataPrivacyAccepted Boolean @default(false)
+
   // Status
   status RegistrationStatus @default(PENDING)
 

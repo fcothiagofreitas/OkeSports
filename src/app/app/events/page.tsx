@@ -98,7 +98,7 @@ export default function EventsPage() {
                 Gerencie seus eventos esportivos
               </p>
             </div>
-            <Link href="/dashboard/events/new">
+            <Link href="/app/events/new">
               <Button className="gap-2">
                 <Plus className="h-4 w-4" />
                 Novo Evento
@@ -124,7 +124,7 @@ export default function EventsPage() {
               <p className="text-[hsl(var(--gray-600))] mb-6">
                 Comece criando seu primeiro evento esportivo
               </p>
-              <Link href="/dashboard/events/new">
+              <Link href="/app/events/new">
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
                   Criar Primeiro Evento
@@ -162,7 +162,7 @@ export default function EventsPage() {
                   </div>
 
                   <div className="flex gap-2">
-                    <Link href={`/dashboard/events/${event.id}/edit`} className="flex-1">
+                    <Link href={`/app/events/${event.id}/edit`} className="flex-1">
                       <Button variant="outline" size="sm" className="w-full gap-2">
                         <Edit className="h-4 w-4" />
                         Editar

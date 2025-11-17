@@ -74,15 +74,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Inscrição não encontrada' }, { status: 404 });
     }
 
-    // TODO: Buscar detalhes do pagamento no Mercado Pago
-    // const mpAccessToken = decrypt(registration.event.organizer.mpAccessToken);
-    // const paymentDetails = await fetch(`https://api.mercadopago.com/v1/payments/${webhook.data.id}`, {
-    //   headers: { Authorization: `Bearer ${mpAccessToken}` }
-    // });
+    // Buscar detalhes do pagamento no Mercado Pago
+    const { decryptOAuthTokens } = await import('@/lib/mercadopago');
+    const { accessToken: mpAccessToken } = decryptOAuthTokens({
+      encryptedAccessToken: registration.event.organizer.mpAccessToken!,
+      encryptedRefreshToken: '',
+    });
 
-    // Mock: Simular pagamento aprovado
-    const paymentStatus = 'approved'; // Na real: paymentDetails.status
-    const paymentMethod = 'pix'; // Na real: paymentDetails.payment_method_id
+    const paymentDetails = await fetch(
+      `https://api.mercadopago.com/v1/payments/${webhook.data.id}`,
+      {
+        headers: { Authorization: `Bearer ${mpAccessToken}` },
+      }
+    );
+
+    if (!paymentDetails.ok) {
+      console.error('Erro ao buscar pagamento no MP:', await paymentDetails.text());
+      return NextResponse.json({ error: 'Erro ao buscar pagamento' }, { status: 500 });
+    }
+
+    const payment = await paymentDetails.json();
+    const paymentStatus = payment.status;
+    const paymentMethod = payment.payment_type_id;
 
     // Processar baseado no status
     if (paymentStatus === 'approved') {

@@ -199,7 +199,7 @@ export default function CadastroPage() {
             <p className="text-sm text-center text-[hsl(var(--gray-600))]">
               Já tem uma conta?{' '}
               <Link
-                href={`/entrar${redirectTo ? `?redirect=${redirectTo}` : ''}`}
+                href={`/login${redirectTo ? `?redirect=${redirectTo}` : ''}`}
                 className="text-[hsl(var(--accent-pink))] hover:underline"
               >
                 Entrar

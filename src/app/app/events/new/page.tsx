@@ -142,7 +142,7 @@ export default function NewEventPage() {
 
   const handleFinish = () => {
     if (createdEventId) {
-      router.push(`/dashboard/events/${createdEventId}/edit`);
+      router.push(`/app/events/${createdEventId}/edit`);
     }
   };
 
@@ -154,7 +154,7 @@ export default function NewEventPage() {
       <div className="bg-white border-b border-[hsl(var(--gray-200))]">
         <div className="max-w-7xl mx-auto px-6 lg:px-10 py-8">
           <Link
-            href="/dashboard/events"
+            href="/app/events"
             className="inline-flex items-center text-sm text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] mb-4 cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -366,7 +366,7 @@ export default function NewEventPage() {
 
               {/* Ações */}
               <div className="flex gap-4 pt-6">
-                <Link href="/dashboard/events" className="flex-1">
+                <Link href="/app/events" className="flex-1">
                   <Button type="button" variant="outline" disabled={isLoading} className="w-full">
                     Cancelar
                   </Button>

@@ -63,7 +63,7 @@ export default function LoginPage() {
       setAuth(result.user, result.accessToken, result.refreshToken);
 
       // Redirecionar para dashboard
-      router.push('/dashboard');
+      router.push('/app');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
@@ -82,6 +82,15 @@ export default function LoginPage() {
         </CardHeader>
         <form onSubmit={handleSubmit(onSubmit)}>
           <CardContent className="space-y-4">
+            {/* Credenciais de Teste - DEV ONLY */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="rounded-md bg-blue-50 p-3 text-xs border border-blue-200">
+                <p className="font-semibold text-blue-900 mb-1">🔧 Acesso de Teste (DEV):</p>
+                <p className="text-blue-700">Email: maria@okesports.com</p>
+                <p className="text-blue-700">Senha: Senha123</p>
+              </div>
+            )}
+
             {sessionExpired && (
               <div className="rounded-md bg-yellow-50 p-3 text-sm text-yellow-800 border border-yellow-200">
                 Sua sessão expirou. Por favor, faça login novamente.
@@ -100,6 +109,7 @@ export default function LoginPage() {
                 id="email"
                 type="email"
                 placeholder="seu@email.com"
+                defaultValue={process.env.NODE_ENV === 'development' ? 'maria@okesports.com' : ''}
                 {...register('email')}
                 disabled={isLoading}
               />
@@ -114,6 +124,7 @@ export default function LoginPage() {
                 id="password"
                 type="password"
                 placeholder="••••••••"
+                defaultValue={process.env.NODE_ENV === 'development' ? 'Senha123' : ''}
                 {...register('password')}
                 disabled={isLoading}
               />

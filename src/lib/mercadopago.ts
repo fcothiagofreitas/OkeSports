@@ -156,6 +156,22 @@ export function encryptOAuthTokens(data: {
 }
 
 /**
+ * Desencripta tokens OAuth do banco
+ */
+export function decryptOAuthTokens(data: {
+  encryptedAccessToken: string;
+  encryptedRefreshToken: string;
+}): {
+  accessToken: string;
+  refreshToken: string;
+} {
+  return {
+    accessToken: decrypt(data.encryptedAccessToken),
+    refreshToken: decrypt(data.encryptedRefreshToken),
+  };
+}
+
+/**
  * Calcula data de expiração do token
  * @param expiresIn - Segundos até expiração (retornado pelo MP)
  */

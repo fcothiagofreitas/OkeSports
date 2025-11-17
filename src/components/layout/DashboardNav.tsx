@@ -13,21 +13,21 @@ export function DashboardNav() {
 
   const handleLogout = () => {
     logout();
-    router.push('/login');
+    router.push('/app/login');
   };
 
   const navigation = [
     {
       name: 'Dashboard',
-      href: '/dashboard',
+      href: '/app',
       icon: LayoutDashboard,
-      current: pathname === '/dashboard',
+      current: pathname === '/app',
     },
     {
       name: 'Eventos',
-      href: '/dashboard/events',
+      href: '/app/events',
       icon: Calendar,
-      current: pathname.startsWith('/dashboard/events'),
+      current: pathname.startsWith('/app/events'),
     },
   ];
 
@@ -37,7 +37,7 @@ export function DashboardNav() {
         <div className="flex justify-between h-20">
           {/* Logo e Menu */}
           <div className="flex items-center space-x-8">
-            <Link href="/dashboard" className="cursor-pointer">
+            <Link href="/app" className="cursor-pointer">
               <h1 className="text-2xl font-bold text-[hsl(var(--accent-pink))] font-sans">
                 🏃 Okê Sports
               </h1>

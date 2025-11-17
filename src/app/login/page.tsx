@@ -34,6 +34,10 @@ export default function LoginPage() {
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    defaultValues: process.env.NODE_ENV === 'development' ? {
+      email: 'thiago@mail.com',
+      password: '123456',
+    } : undefined,
   });
 
   const onSubmit = async (data: LoginFormData) => {
@@ -142,7 +146,7 @@ export default function LoginPage() {
             <p className="text-sm text-center text-[hsl(var(--gray-600))]">
               Não tem uma conta?{' '}
               <Link
-                href={`/criar-conta${redirectTo ? `?redirect=${redirectTo}` : ''}`}
+                href={`/cadastro${redirectTo ? `?redirect=${redirectTo}` : ''}`}
                 className="text-[hsl(var(--accent-pink))] hover:underline"
               >
                 Criar conta
