@@ -63,21 +63,22 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Obter access token
-    // Em desenvolvimento, usar token de teste do .env
+    // Para simplificar os testes de fluxo, em desenvolvimento usamos
+    // sempre o access token de teste da aplicação Okê Sports.
     let accessToken: string;
 
     if (process.env.NODE_ENV === 'development' && process.env.MP_TEST_ACCESS_TOKEN) {
       accessToken = process.env.MP_TEST_ACCESS_TOKEN;
-      console.log('🧪 Usando credenciais de teste do Mercado Pago');
+      console.log('🧪 Usando credenciais de teste do Mercado Pago (app Okê)');
     } else {
-      // Em produção, descriptografar token do organizador
+      // Em produção, descriptografar token do organizador conectado via OAuth
       try {
         accessToken = decryptOAuthTokens({
           encryptedAccessToken: registration.event.organizer.mpAccessToken,
           encryptedRefreshToken: '', // Não precisamos agora
         }).accessToken;
       } catch (error) {
-        console.error('Error decrypting access token:', error);
+        console.error('Error decrypting organizer access token:', error);
         return NextResponse.json(
           { error: 'Erro ao processar credenciais de pagamento' },
           { status: 500 }
@@ -112,6 +113,7 @@ export async function POST(request: NextRequest) {
       notification_url: `${appUrl}/api/webhooks/mercadopago`,
       external_reference: registrationId,
       statement_descriptor: 'OKESPORTS',
+      // marketplace_fee desabilitado temporariamente para focar no teste de fluxo
       metadata: {
         registration_id: registrationId,
         event_id: registration.eventId,

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import prisma from '@/lib/db';
 import { mercadoPagoWebhookSchema } from '@/lib/validations/webhook';
 import {
@@ -14,9 +15,75 @@ import { ZodError } from 'zod';
 // Recebe notificações do Mercado Pago sobre pagamentos
 // Webhook configurado no painel do MP
 
+function verifySignature({
+  rawBody,
+  signatureHeader,
+  requestUrl,
+}: {
+  rawBody: string;
+  signatureHeader: string | null;
+  requestUrl: string;
+}): boolean {
+  const secret = process.env.MP_WEBHOOK_SECRET;
+  if (!secret || !signatureHeader) {
+    return true;
+  }
+
+  const tsMatch = signatureHeader.match(/ts=(\d+)/);
+  const v1Match = signatureHeader.match(/v1=([^,]+)/);
+
+  if (!tsMatch || !v1Match) {
+    return false;
+  }
+
+  const timestamp = tsMatch[1];
+  const signature = v1Match[1];
+  const payload = `${timestamp}.${requestUrl}.${rawBody}`;
+  const computed = crypto.createHmac('sha256', secret).update(payload).digest('hex');
+
+  const signatureBuffer = Buffer.from(signature);
+  const computedBuffer = Buffer.from(computed);
+
+  if (signatureBuffer.length !== computedBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(signatureBuffer, computedBuffer);
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const rawBody = await request.text();
+    let body: unknown;
+
+    try {
+      body = JSON.parse(rawBody || '{}');
+    } catch {
+      return NextResponse.json({ error: 'Payload inválido' }, { status: 400 });
+    }
+
+    const signatureHeader = request.headers.get('x-signature');
+    const expectedUrl =
+      process.env.MP_WEBHOOK_URL ||
+      `${process.env.NEXT_PUBLIC_APP_URL || 'https://dev.okesports.com.br'}/api/webhooks/mercadopago`;
+
+    if (!verifySignature({ rawBody, signatureHeader, requestUrl: expectedUrl })) {
+      console.warn('Assinatura do webhook Mercado Pago inválida');
+      return NextResponse.json({ error: 'Assinatura inválida' }, { status: 401 });
+    }
+
+    // Idempotência: usar x-request-id para evitar processamento duplicado
+    const requestId = request.headers.get('x-request-id');
+    if (requestId) {
+      const alreadyProcessed = await prisma.processedWebhook.findUnique({
+        where: { requestId },
+      });
+
+      if (alreadyProcessed) {
+        console.log('Webhook MP ignorado (idempotência) para x-request-id:', requestId);
+        return NextResponse.json({ message: 'Webhook já processado' }, { status: 200 });
+      }
+    }
 
     // Validar payload do webhook
     const webhook = mercadoPagoWebhookSchema.parse(body);
@@ -76,9 +143,10 @@ export async function POST(request: NextRequest) {
 
     // Buscar detalhes do pagamento no Mercado Pago
     const { decryptOAuthTokens } = await import('@/lib/mercadopago');
+    // TODO: armazenar e usar também o refresh_token para renovar access tokens se necessário
     const { accessToken: mpAccessToken } = decryptOAuthTokens({
       encryptedAccessToken: registration.event.organizer.mpAccessToken!,
-      encryptedRefreshToken: '',
+      encryptedRefreshToken: registration.event.organizer.mpAccessToken!, // placeholder para manter assinatura da função; não é usado aqui
     });
 
     const paymentDetails = await fetch(
@@ -106,7 +174,7 @@ export async function POST(request: NextRequest) {
           paymentStatus: 'APPROVED',
           status: 'CONFIRMED',
           paymentMethod,
-          paidAt: new Date(),
+          confirmedAt: new Date(),
         },
       });
 
@@ -126,6 +194,15 @@ export async function POST(request: NextRequest) {
         participantEmail: registration.participant.email,
       });
 
+      // Registrar webhook como processado (idempotência)
+      if (requestId) {
+        await prisma.processedWebhook.create({
+          data: {
+            requestId,
+          },
+        });
+      }
+
       // TODO: Enviar email de confirmação
       // await sendConfirmationEmail(registration);
 
@@ -144,6 +221,15 @@ export async function POST(request: NextRequest) {
         registrationId: registration.id,
         status: paymentStatus,
       });
+
+      // Registrar webhook como processado (idempotência)
+      if (requestId) {
+        await prisma.processedWebhook.create({
+          data: {
+            requestId,
+          },
+        });
+      }
 
       return NextResponse.json({ message: 'Pagamento cancelado' });
     }

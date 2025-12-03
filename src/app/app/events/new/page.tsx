@@ -19,18 +19,40 @@ import { ModalityManager } from '@/components/features/events/ModalityManager';
 
 const STORAGE_KEY = 'event-draft-form';
 
-const eventSchema = z.object({
-  name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
-  description: z.string().min(10, 'Descrição deve ter no mínimo 10 caracteres'),
-  shortDescription: z.string().optional(),
-  eventDate: z.string().min(1, 'Data do evento é obrigatória'),
-  registrationStart: z.string().min(1, 'Data de início das inscrições é obrigatória'),
-  registrationEnd: z.string().min(1, 'Data de fim das inscrições é obrigatória'),
-  city: z.string().min(2, 'Cidade é obrigatória'),
-  state: z.string().length(2, 'Estado deve ter 2 caracteres (ex: SP)'),
-  address: z.string().optional(),
-  zipCode: z.string().optional(),
-});
+const eventSchema = z
+  .object({
+    name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
+    description: z.string().min(10, 'Descrição deve ter no mínimo 10 caracteres'),
+    shortDescription: z.string().optional(),
+    eventDate: z.string().min(1, 'Data do evento é obrigatória'),
+    registrationStart: z.string().min(1, 'Data de início das inscrições é obrigatória'),
+    registrationEnd: z.string().min(1, 'Data de fim das inscrições é obrigatória'),
+    city: z.string().min(2, 'Cidade é obrigatória'),
+    state: z.string().length(2, 'Estado deve ter 2 caracteres (ex: SP)'),
+    address: z.string().optional(),
+    zipCode: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const eventDate = new Date(data.eventDate);
+    const regStart = new Date(data.registrationStart);
+    const regEnd = new Date(data.registrationEnd);
+
+    if (regStart >= regEnd) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['registrationEnd'],
+        message: 'Fim das inscrições deve ser depois do início das inscrições',
+      });
+    }
+
+    if (regEnd > eventDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['registrationEnd'],
+        message: 'Fim das inscrições deve ser no máximo na data do evento',
+      });
+    }
+  });
 
 type EventFormData = z.infer<typeof eventSchema>;
 type TabType = 'info' | 'modalities' | 'batches' | 'coupons';

@@ -99,16 +99,40 @@ export const updateEventSchema = z
     allowGroupReg: z.boolean().optional(),
     maxGroupSize: z.number().int().min(1).max(100).optional(),
   })
-  .partial();
+  .partial()
+  .superRefine((data, ctx) => {
+    // Validar relação entre datas apenas se todas estiverem presentes no payload
+    if (data.eventDate && data.registrationStart && data.registrationEnd) {
+      const eventDate = new Date(data.eventDate as any);
+      const regStart = new Date(data.registrationStart as any);
+      const regEnd = new Date(data.registrationEnd as any);
+
+      if (regStart >= regEnd) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['registrationEnd'],
+          message: 'Fim das inscrições deve ser depois do início das inscrições',
+        });
+      }
+
+      if (regEnd > eventDate) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['registrationEnd'],
+          message: 'Fim das inscrições deve ser no máximo na data do evento',
+        });
+      }
+    }
+  });
 
 /**
  * Schema para query params de listagem
  */
 export const listEventsQuerySchema = z.object({
-  page: z.string().regex(/^\d+$/).transform(Number).default('1'),
-  limit: z.string().regex(/^\d+$/).transform(Number).default('10'),
+  page: z.preprocess((val) => Number(val), z.number().int().min(1)).optional(),
+  limit: z.preprocess((val) => Number(val), z.number().int().min(1).max(50)).optional(),
   status: z.enum(['DRAFT', 'PUBLISHED', 'PAUSED', 'SOLD_OUT', 'FINISHED', 'CANCELLED']).optional(),
-  search: z.string().optional(), // Buscar por nome
+  search: z.string().optional(),
 });
 
 /**

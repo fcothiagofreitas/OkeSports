@@ -235,6 +235,14 @@ export default function InscricaoPage() {
     }
   };
 
+  useEffect(() => {
+    // Se já existe inscrição pendente, enviar direto para o checkout
+    // para evitar que o atleta tenha que refazer a escolha da modalidade.
+    if (existingRegistration && existingRegistration.paymentStatus === 'PENDING' && !isLoading) {
+      void handlePayment();
+    }
+  }, [existingRegistration, isLoading]);
+
   if (loadingEvent || checkingRegistration) {
     return (
       <div className="min-h-screen bg-[hsl(var(--gray-100))] flex items-center justify-center">
@@ -267,7 +275,7 @@ export default function InscricaoPage() {
   // Se já existe inscrição, mostrar status
   if (existingRegistration) {
     const getStatusInfo = () => {
-      if (existingRegistration.paymentStatus === 'PAID') {
+      if (existingRegistration.paymentStatus === 'APPROVED') {
         return {
           icon: <CheckCircle2 className="h-12 w-12 text-green-600" />,
           title: 'Inscrição Confirmada!',
@@ -371,7 +379,7 @@ export default function InscricaoPage() {
                   </div>
                 </div>
 
-                {existingRegistration.paymentStatus !== 'PAID' && (
+                {existingRegistration.paymentStatus !== 'APPROVED' && (
                   <>
                     {error && (
                       <div className="rounded-md bg-red-50 p-3 text-sm text-red-800 border border-red-200 mb-4">

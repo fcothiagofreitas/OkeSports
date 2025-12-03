@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useParticipantAuthStore } from '@/stores/participantAuthStore';
+import { cn } from '@/lib/utils';
 
 interface RegistrationButtonProps {
   eventSlug: string;
@@ -10,6 +11,8 @@ interface RegistrationButtonProps {
   modalityName: string;
   isDisabled: boolean;
   disabledReason?: string;
+  className?: string;
+  labelOverride?: string;
 }
 
 export function RegistrationButton({
@@ -18,6 +21,8 @@ export function RegistrationButton({
   modalityName,
   isDisabled,
   disabledReason,
+  className,
+  labelOverride,
 }: RegistrationButtonProps) {
   const router = useRouter();
   const { isAuthenticated } = useParticipantAuthStore();
@@ -36,12 +41,8 @@ export function RegistrationButton({
   };
 
   return (
-    <Button
-      className="w-full"
-      disabled={isDisabled}
-      onClick={handleClick}
-    >
-      {disabledReason || 'Inscrever-se'}
+    <Button className={cn('w-full', className)} disabled={isDisabled} onClick={handleClick}>
+      {disabledReason || labelOverride || 'Inscrever-se'}
     </Button>
   );
 }

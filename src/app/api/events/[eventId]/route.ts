@@ -27,7 +27,11 @@ async function getEvent(
         },
         _count: {
           select: {
-            registrations: true,
+            registrations: {
+              where: {
+                status: 'CONFIRMED',
+              },
+            },
             modalities: true,
           },
         },
@@ -126,7 +130,11 @@ async function updateEvent(
         _count: {
           select: {
             modalities: true,
-            registrations: true,
+            registrations: {
+              where: {
+                status: 'CONFIRMED',
+              },
+            },
           },
         },
       },
@@ -168,7 +176,11 @@ async function deleteEvent(
         organizerId: true,
         _count: {
           select: {
-            registrations: true,
+            registrations: {
+              where: {
+                status: 'CONFIRMED',
+              },
+            },
           },
         },
       },

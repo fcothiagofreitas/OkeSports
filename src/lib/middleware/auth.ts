@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAccessToken, extractBearerToken } from '@/lib/auth';
+import prisma from '@/lib/db';
 import type { AuthTokenPayload } from '@/types/auth';
 
 /**
@@ -41,6 +42,19 @@ export function withAuth(
 
       // Verify token
       const payload = verifyAccessToken(token);
+
+      // Ensure user still exists (token pode ser de um banco resetado)
+      const dbUser = await prisma.user.findUnique({
+        where: { id: payload.userId },
+        select: { id: true },
+      });
+
+      if (!dbUser) {
+        return NextResponse.json(
+          { error: 'Token inválido ou expirado' },
+          { status: 401 }
+        );
+      }
 
       // Attach user data to request
       const authenticatedRequest = request as NextRequest & {
@@ -104,13 +118,20 @@ export function withOptionalAuth(
           // Verify token
           const payload = verifyAccessToken(token);
 
-          // Attach user data to request
-          const authenticatedRequest = request as NextRequest & {
-            user?: AuthTokenPayload;
-          };
-          authenticatedRequest.user = payload;
+          const dbUser = await prisma.user.findUnique({
+            where: { id: payload.userId },
+            select: { id: true },
+          });
 
-          return await handler(authenticatedRequest);
+          if (dbUser) {
+            // Attach user data to request
+            const authenticatedRequest = request as NextRequest & {
+              user?: AuthTokenPayload;
+            };
+            authenticatedRequest.user = payload;
+
+            return await handler(authenticatedRequest);
+          }
         } catch {
           // Token is invalid, but that's OK (optional auth)
           // Continue without user data

@@ -370,3 +370,15 @@ enum RegistrationStatus {
   CONFIRMED // Confirmada (paga)
   CANCELLED // Cancelada
 }
+
+// ============================================
+// 8. WEBHOOKS PROCESSADOS (ProcessedWebhook)
+// ============================================
+
+model ProcessedWebhook {
+  id        String   @id @default(cuid())
+  requestId String   @unique
+  createdAt DateTime @default(now())
+
+  @@map("processed_webhooks")
+}

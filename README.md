@@ -296,7 +296,7 @@ docs/update-readme
 
 ---
 
-## 🗺 Roadmap
+## 🗺 Roadmap (resumido)
 
 ### ✅ Concluído
 
@@ -304,19 +304,22 @@ docs/update-readme
 - [x] Stack tecnológico definido
 - [x] Setup do projeto (M1.1)
 - [x] Schema Prisma completo
+- [x] Autenticação do organizador (JWT + refresh) – M1.2
+- [x] Integração básica OAuth Mercado Pago (organizador) – M1.3
+- [x] CRUD inicial de eventos e modalidades – início de M2
 
 ### 🚧 Em Andamento
 
-- [ ] M0: Validação de mercado
-- [ ] M1.2: Autenticação (JWT)
-- [ ] M1.3: OAuth Mercado Pago
+- [ ] Consolidação de pagamentos (M3/M4)
+  - Split payment com `marketplace_fee` (taxa 10%)
+  - Fluxo completo de inscrição + criação de preference
+  - Webhook Mercado Pago com validação de assinatura e idempotência
 
 ### 📅 Próximos
 
-- [ ] M2: CRUD de Eventos
-- [ ] M3: Checkout + Pagamento PIX
-- [ ] M4: Dashboard Organizador
-- [ ] M5: Marketplace Público
+- [ ] Refinar dashboard do organizador (M4)
+- [ ] Melhorar fluxo completo do atleta (M3/M5)
+- [ ] Marketplace público e busca de eventos (M5)
 
 Veja o roadmap completo em: [`Milestones_Oke_Sports_Completo.md`](Milestones_Oke_Sports_Completo.md)
 

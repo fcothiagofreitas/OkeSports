@@ -23,6 +23,7 @@ interface Registration {
     bannerUrl: string | null;
   };
   modality: {
+    id: string;
     name: string;
   };
 }
@@ -242,15 +243,35 @@ export default function MinhaContaPage() {
                         </div>
 
                         <div className="mt-4 flex gap-2">
-                          <Link href={`/e/${registration.event.slug}`} className="flex-1">
-                            <Button variant="outline" size="sm" className="w-full">
-                              Ver Evento
-                            </Button>
-                          </Link>
-                          {registration.status === 'CONFIRMED' && (
-                            <Button variant="outline" size="sm" disabled>
-                              Baixar Comprovante
-                            </Button>
+                          {registration.status === 'PENDING' ? (
+                            <>
+                              <Link
+                                href={`/e/${registration.event.slug}/inscricao/${registration.modality.id}`}
+                                className="flex-1"
+                              >
+                                <Button size="sm" className="w-full">
+                                  Realizar Pagamento
+                                </Button>
+                              </Link>
+                              <Link href={`/e/${registration.event.slug}`} className="flex-1">
+                                <Button variant="outline" size="sm" className="w-full">
+                                  Ver Evento
+                                </Button>
+                              </Link>
+                            </>
+                          ) : (
+                            <>
+                              <Link href={`/e/${registration.event.slug}`} className="flex-1">
+                                <Button variant="outline" size="sm" className="w-full">
+                                  Ver Evento
+                                </Button>
+                              </Link>
+                              {registration.status === 'CONFIRMED' && (
+                                <Button variant="outline" size="sm" disabled>
+                                  Baixar Comprovante
+                                </Button>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>

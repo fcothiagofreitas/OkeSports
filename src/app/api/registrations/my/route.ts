@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
         },
         modality: {
           select: {
+            id: true,
             name: true,
           },
         },

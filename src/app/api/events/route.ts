@@ -101,12 +101,27 @@ async function listEvents(request: NextRequest & { user: { userId: string } }) {
     const { searchParams } = request.nextUrl;
 
     // Validar query params
-    const { page, limit, status, search } = listEventsQuerySchema.parse({
-      page: searchParams.get('page') || '1',
-      limit: searchParams.get('limit') || '10',
-      status: searchParams.get('status') || undefined,
-      search: searchParams.get('search') || undefined,
+    const defaultPage = Number(searchParams.get('page')) || 1;
+    const defaultLimit = Number(searchParams.get('limit')) || 10;
+    const rawStatus = searchParams.get('status');
+    const rawSearch = searchParams.get('search') || undefined;
+
+    const parsed = listEventsQuerySchema.safeParse({
+      page: defaultPage,
+      limit: defaultLimit,
+      status: rawStatus === 'ALL' ? undefined : rawStatus || undefined,
+      search: rawSearch,
     });
+
+    if (!parsed.success) {
+      console.warn('Parâmetros inválidos em /api/events:', parsed.error.flatten());
+      return NextResponse.json(
+        { error: 'Parâmetros inválidos', details: parsed.error.errors },
+        { status: 400 }
+      );
+    }
+
+    const { page, limit, status, search } = parsed.data;
 
     // Construir filtros
     const where: any = {
@@ -133,7 +148,11 @@ async function listEvents(request: NextRequest & { user: { userId: string } }) {
           _count: {
             select: {
               modalities: true,
-              registrations: true,
+              registrations: {
+                where: {
+                  status: 'CONFIRMED',
+                },
+              },
             },
           },
         },
@@ -145,6 +164,17 @@ async function listEvents(request: NextRequest & { user: { userId: string } }) {
       }),
       prisma.event.count({ where }),
     ]);
+
+    if (total === 0) {
+      const debugTotal = await prisma.event.count();
+      console.warn(
+        `[Events API] Organizer ${userId} sem eventos. Total geral no banco: ${debugTotal}`
+      );
+    } else {
+      console.log(
+        `[Events API] Organizer ${userId} | status=${status ?? 'ALL'} | search=${search ?? '-'} | total=${total}`
+      );
+    }
 
     return NextResponse.json({
       events,

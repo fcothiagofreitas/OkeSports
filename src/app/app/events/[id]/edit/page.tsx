@@ -18,19 +18,41 @@ import { apiGet, apiPatch, ApiError } from '@/lib/api';
 import { DashboardNav } from '@/components/layout/DashboardNav';
 import { ModalityManager } from '@/components/features/events/ModalityManager';
 
-const eventSchema = z.object({
-  name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
-  description: z.string().min(10, 'Descrição deve ter no mínimo 10 caracteres'),
-  shortDescription: z.string().optional(),
-  eventDate: z.string().min(1, 'Data do evento é obrigatória'),
-  registrationStart: z.string().min(1, 'Data de início das inscrições é obrigatória'),
-  registrationEnd: z.string().min(1, 'Data de fim das inscrições é obrigatória'),
-  status: z.enum(['DRAFT', 'PUBLISHED', 'CANCELLED']),
-  city: z.string().min(2, 'Cidade é obrigatória'),
-  state: z.string().length(2, 'Estado deve ter 2 caracteres (ex: SP)'),
-  address: z.string().optional(),
-  zipCode: z.string().optional(),
-});
+const eventSchema = z
+  .object({
+    name: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
+    description: z.string().min(10, 'Descrição deve ter no mínimo 10 caracteres'),
+    shortDescription: z.string().optional(),
+    eventDate: z.string().min(1, 'Data do evento é obrigatória'),
+    registrationStart: z.string().min(1, 'Data de início das inscrições é obrigatória'),
+    registrationEnd: z.string().min(1, 'Data de fim das inscrições é obrigatória'),
+    status: z.enum(['DRAFT', 'PUBLISHED', 'CANCELLED']),
+    city: z.string().min(2, 'Cidade é obrigatória'),
+    state: z.string().length(2, 'Estado deve ter 2 caracteres (ex: SP)'),
+    address: z.string().optional(),
+    zipCode: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const eventDate = new Date(data.eventDate);
+    const regStart = new Date(data.registrationStart);
+    const regEnd = new Date(data.registrationEnd);
+
+    if (regStart >= regEnd) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['registrationEnd'],
+        message: 'Fim das inscrições deve ser depois do início das inscrições',
+      });
+    }
+
+    if (regEnd > eventDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['registrationEnd'],
+        message: 'Fim das inscrições deve ser no máximo na data do evento',
+      });
+    }
+  });
 
 type EventFormData = z.infer<typeof eventSchema>;
 
@@ -352,6 +374,54 @@ export default function EditEventPage() {
 
       {/* Content */}
       <main className="max-w-7xl mx-auto px-6 lg:px-10 py-12">
+        {event && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-xs uppercase tracking-wide text-[hsl(var(--gray-500))]">Inscrições confirmadas</p>
+                <p className="text-3xl font-bold text-[hsl(var(--dark))] mt-2">
+                  {event._count?.registrations ?? 0}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-xs uppercase tracking-wide text-[hsl(var(--gray-500))]">Modalidades</p>
+                <p className="text-3xl font-bold text-[hsl(var(--dark))] mt-2">
+                  {event._count?.modalities ?? 0}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6 space-y-2">
+                <p className="text-xs uppercase tracking-wide text-[hsl(var(--gray-500))]">Ações rápidas</p>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copyPublicLink}
+                    disabled={!event.slug}
+                    className="gap-2"
+                  >
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {copied ? 'Link copiado' : 'Copiar link público'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={openPublicPage}
+                    disabled={!event.slug}
+                    className="gap-2"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Abrir página pública
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Tab: Informações Básicas */}
         {activeTab === 'info' && (
           <Card>
