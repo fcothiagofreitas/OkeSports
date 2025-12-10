@@ -12,11 +12,21 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '@/stores/authStore';
-import { ArrowLeft, Calendar, Users, ExternalLink, Copy, Check } from 'lucide-react';
+import { ArrowLeft, Calendar, Users, ExternalLink, Copy, Check, Trash2, Plus } from 'lucide-react';
 import { apiGet, apiPatch, ApiError } from '@/lib/api';
 import { DashboardNav } from '@/components/layout/DashboardNav';
 import { ModalityManager } from '@/components/features/events/ModalityManager';
+import { IconSelector } from '@/components/features/events/IconSelector';
+import { getIconByKey } from '@/constants/landingIcons';
+import { cn } from '@/lib/utils';
 
 const eventSchema = z
   .object({
@@ -79,9 +89,31 @@ interface Event {
     modalities: number;
     registrations: number;
   };
+  landingSellingPoints?: LandingSellingPoint[] | null;
+  landingAbout?: LandingAbout | null;
+  landingFaq?: LandingFaqItem[] | null;
+  supportEmail?: string | null;
+  supportWhatsapp?: string | null;
 }
 
-type TabType = 'info' | 'modalities' | 'batches' | 'coupons';
+interface LandingSellingPoint {
+  title: string;
+  description: string;
+  icon?: LandingIconKey | '';
+}
+
+interface LandingAbout {
+  description?: string;
+  includes?: string[];
+  tips?: string[];
+}
+
+interface LandingFaqItem {
+  question: string;
+  answer: string;
+}
+
+type TabType = 'info' | 'landing' | 'modalities' | 'batches' | 'coupons';
 
 export default function EditEventPage() {
   const router = useRouter();
@@ -93,6 +125,14 @@ export default function EditEventPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [copied, setCopied] = useState(false);
+  const [sellingPoints, setSellingPoints] = useState<LandingSellingPoint[]>([]);
+  const [aboutDescription, setAboutDescription] = useState('');
+  const [aboutIncludes, setAboutIncludes] = useState('');
+  const [aboutTips, setAboutTips] = useState('');
+  const [faqItems, setFaqItems] = useState<LandingFaqItem[]>([]);
+  const [supportEmail, setSupportEmail] = useState('');
+  const [supportWhatsapp, setSupportWhatsapp] = useState('');
+  const [isSavingLanding, setIsSavingLanding] = useState(false);
 
   const {
     register,
@@ -127,6 +167,22 @@ export default function EditEventPage() {
         address: data.location?.street || '',
         zipCode: data.location?.cep || '',
       });
+      const points = Array.isArray(data.landingSellingPoints)
+        ? (data.landingSellingPoints as LandingSellingPoint[])
+        : [];
+      const placeholders = Array.from({ length: 3 }, () => ({ title: '', description: '', icon: '' }));
+      const normalizedPoints = [...points, ...placeholders].slice(0, 3);
+      setSellingPoints(normalizedPoints);
+      setAboutDescription(data.landingAbout?.description || '');
+      setAboutIncludes((data.landingAbout?.includes || []).join('\n'));
+      setAboutTips((data.landingAbout?.tips || []).join('\n'));
+      const faq =
+        Array.isArray(data.landingFaq) && data.landingFaq.length
+          ? (data.landingFaq as LandingFaqItem[])
+          : [{ question: '', answer: '' }];
+      setFaqItems(faq);
+      setSupportEmail(data.supportEmail || '');
+      setSupportWhatsapp(data.supportWhatsapp || '');
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         // apiGet já redireciona para login
@@ -232,6 +288,82 @@ export default function EditEventPage() {
   const openPublicPage = () => {
     if (!event?.slug) return;
     window.open(`/e/${event.slug}`, '_blank');
+  };
+
+  const updateSellingPoint = (index: number, field: keyof LandingSellingPoint, value: string) => {
+    setSellingPoints((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const handleFaqChange = (index: number, field: keyof LandingFaqItem, value: string) => {
+    setFaqItems((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const handleAddFaq = () => {
+    setFaqItems((prev) => [...prev, { question: '', answer: '' }]);
+  };
+
+  const handleRemoveFaq = (index: number) => {
+    setFaqItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleLandingSave = async () => {
+    try {
+      setIsSavingLanding(true);
+      const parseLines = (text: string) =>
+        text
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean);
+
+      const sellingPointsPayload = sellingPoints
+        .filter((point) => point.title && point.description)
+        .map((point) => ({
+          title: point.title,
+          description: point.description,
+          icon: point.icon || undefined,
+        }));
+
+      const includesArray = parseLines(aboutIncludes);
+      const tipsArray = parseLines(aboutTips);
+      const aboutPayload = {
+        description: aboutDescription ?? '',
+        includes: includesArray,
+        tips: tipsArray,
+      };
+
+      const faqPayload = faqItems.filter((item) => item.question && item.answer);
+
+      const payload: any = {
+        landingSellingPoints: sellingPointsPayload,
+        landingAbout: aboutPayload,
+        landingFaq: faqPayload,
+        supportEmail: supportEmail || null,
+        supportWhatsapp: supportWhatsapp || null,
+      };
+
+      const result = await apiPatch<Event>(`/api/events/${params.id}`, payload);
+      setEvent(result);
+      alert('Landing atualizada com sucesso!');
+    } catch (error) {
+      console.error('Erro ao salvar landing:', error);
+      if (error instanceof ApiError) {
+        const detailMessage =
+          error.data?.details?.[0]?.message || (typeof error.data?.error === 'string' ? error.data.error : null);
+        alert(detailMessage ? `Erro ao salvar landing: ${detailMessage}` : 'Dados inválidos ao salvar landing.');
+      } else {
+        alert('Erro ao salvar landing. Tente novamente.');
+      }
+    } finally {
+      setIsSavingLanding(false);
+    }
   };
 
   if (isFetching) {
@@ -351,6 +483,16 @@ export default function EditEventPage() {
               }`}
             >
               Informações Básicas
+            </button>
+            <button
+              onClick={() => setActiveTab('landing')}
+              className={`px-6 py-3 font-medium text-sm transition-colors ${
+                activeTab === 'landing'
+                  ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
+                  : 'text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
+              }`}
+            >
+              Landing
             </button>
             <button
               onClick={() => setActiveTab('modalities')}
@@ -562,6 +704,157 @@ export default function EditEventPage() {
                   </div>
                 </form>
             </CardContent>
+          </Card>
+        )}
+
+        {activeTab === 'landing' && (
+          <Card className="p-6 space-y-8">
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold text-[hsl(var(--dark))]">Destaques (Hero)</h3>
+              <p className="text-sm text-[hsl(var(--gray-600))]">
+                Esses cards aparecem no topo da landing. Preencha até três itens.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {sellingPoints.map((point, index) => {
+                  return (
+                    <div key={index} className="border border-[hsl(var(--gray-200))] rounded-xl p-4 space-y-3">
+                    <p className="text-sm font-semibold text-[hsl(var(--gray-600))]">Destaque {index + 1}</p>
+                    <div className="space-y-2">
+                      <Label>Título</Label>
+                      <Input
+                        value={point.title || ''}
+                        onChange={(e) => updateSellingPoint(index, 'title', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Descrição</Label>
+                      <Textarea
+                        value={point.description || ''}
+                        onChange={(e) => updateSellingPoint(index, 'description', e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Ícone (opcional)</Label>
+                      <IconSelector
+                        value={point.icon || undefined}
+                        onChange={(iconKey) => updateSellingPoint(index, 'icon', iconKey)}
+                        onClear={() => updateSellingPoint(index, 'icon', '')}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold text-[hsl(var(--dark))]">Sobre o evento</h3>
+              <div className="space-y-2">
+                <Label>Descrição</Label>
+                <Textarea
+                  rows={4}
+                  value={aboutDescription}
+                  onChange={(e) => setAboutDescription(e.target.value)}
+                  placeholder="Texto principal sobre o evento..."
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Inclui (uma linha por item)</Label>
+                  <Textarea
+                    rows={4}
+                    value={aboutIncludes}
+                    onChange={(e) => setAboutIncludes(e.target.value)}
+                    placeholder={'Camiseta oficial\nMedalha finisher\nHidratação e frutas'}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Dicas rápidas (uma linha por item)</Label>
+                  <Textarea
+                    rows={4}
+                    value={aboutTips}
+                    onChange={(e) => setAboutTips(e.target.value)}
+                    placeholder={'Chegue com 1h de antecedência\nUse protetor solar'}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold text-[hsl(var(--dark))]">FAQ</h3>
+              <p className="text-sm text-[hsl(var(--gray-600))]">
+                Perguntas frequentes exibidas no final da landing.
+              </p>
+              <div className="space-y-4">
+                {faqItems.map((faq, index) => (
+                  <div
+                    key={index}
+                    className="border border-[hsl(var(--gray-200))] rounded-xl p-4 space-y-3 bg-[hsl(var(--gray-50))]"
+                  >
+                    <div className="flex justify-between items-center">
+                      <p className="font-medium text-[hsl(var(--dark))]">Pergunta #{index + 1}</p>
+                      {faqItems.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveFaq(index)}
+                          className="text-red-500"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Pergunta</Label>
+                      <Input
+                        value={faq.question}
+                        onChange={(e) => handleFaqChange(index, 'question', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Resposta</Label>
+                      <Textarea
+                        rows={3}
+                        value={faq.answer}
+                        onChange={(e) => handleFaqChange(index, 'answer', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={handleAddFaq} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Adicionar FAQ
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>E-mail de suporte</Label>
+                <Input
+                  type="email"
+                  value={supportEmail}
+                  onChange={(e) => setSupportEmail(e.target.value)}
+                  placeholder="contato@evento.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>WhatsApp de suporte</Label>
+                <Input
+                  value={supportWhatsapp}
+                  onChange={(e) => setSupportWhatsapp(e.target.value)}
+                  placeholder="+55 11 99999-9999"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <Button type="button" onClick={handleLandingSave} disabled={isSavingLanding}>
+                {isSavingLanding ? 'Salvando...' : 'Salvar Landing'}
+              </Button>
+            </div>
           </Card>
         )}
 

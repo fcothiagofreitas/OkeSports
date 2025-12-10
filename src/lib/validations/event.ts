@@ -24,6 +24,23 @@ export const eventLocationSchema = z.object({
   longitude: z.number().min(-180).max(180).optional(),
 });
 
+const landingSellingPointSchema = z.object({
+  title: z.string().min(1, 'Título do destaque é obrigatório'),
+  description: z.string().min(1, 'Descrição do destaque é obrigatória'),
+  icon: z.string().optional(),
+});
+
+const landingAboutSchema = z.object({
+  description: z.string().optional(),
+  includes: z.array(z.string().min(1)).optional(),
+  tips: z.array(z.string().min(1)).optional(),
+});
+
+const landingFaqItemSchema = z.object({
+  question: z.string().min(1, 'Pergunta é obrigatória'),
+  answer: z.string().min(1, 'Resposta é obrigatória'),
+});
+
 /**
  * Schema para criar evento
  */
@@ -51,6 +68,13 @@ export const createEventSchema = z
     maxRegistrations: z.number().int().positive().optional(),
     allowGroupReg: z.boolean().default(true),
     maxGroupSize: z.number().int().min(1).max(100).default(10),
+
+    // Landing page
+    landingSellingPoints: z.array(landingSellingPointSchema).max(3).optional().nullable(),
+    landingAbout: landingAboutSchema.optional().nullable(),
+    landingFaq: z.array(landingFaqItemSchema).optional().nullable(),
+    supportEmail: z.string().email().optional().nullable(),
+    supportWhatsapp: z.string().optional().nullable(),
 
     // Status inicial
     status: z.enum(['DRAFT', 'PUBLISHED']).default('DRAFT'),
@@ -98,6 +122,11 @@ export const updateEventSchema = z
     maxRegistrations: z.number().int().positive().optional().nullable(),
     allowGroupReg: z.boolean().optional(),
     maxGroupSize: z.number().int().min(1).max(100).optional(),
+    landingSellingPoints: z.array(landingSellingPointSchema).max(3).optional().nullable(),
+    landingAbout: landingAboutSchema.optional().nullable(),
+    landingFaq: z.array(landingFaqItemSchema).optional().nullable(),
+    supportEmail: z.string().email().optional().nullable(),
+    supportWhatsapp: z.string().optional().nullable(),
   })
   .partial()
   .superRefine((data, ctx) => {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { withAuth } from '@/lib/middleware/auth';
 import prisma from '@/lib/db';
 import { updateEventSchema } from '@/lib/validations/event';
@@ -96,6 +97,24 @@ async function updateEvent(
     // Converter datas se fornecidas
     const updateData: any = { ...validatedData };
 
+    const jsonFields: Array<'landingSellingPoints' | 'landingAbout' | 'landingFaq'> = [
+      'landingSellingPoints',
+      'landingAbout',
+      'landingFaq',
+    ];
+
+    jsonFields.forEach((field) => {
+      if (field in updateData) {
+        if (updateData[field] === null) {
+          updateData[field] = Prisma.DbNull;
+        } else if (Array.isArray(updateData[field])) {
+          updateData[field] = updateData[field] as Prisma.JsonArray;
+        } else if (typeof updateData[field] === 'object' && updateData[field] !== null) {
+          updateData[field] = updateData[field] as Prisma.JsonObject;
+        }
+      }
+    });
+
     if (validatedData.eventDate) {
       updateData.eventDate = new Date(validatedData.eventDate);
     }
@@ -150,7 +169,14 @@ async function updateEvent(
     }
 
     console.error('Update event error:', error);
-    return NextResponse.json({ error: 'Erro ao atualizar evento' }, { status: 500 });
+    const details =
+      error instanceof Error
+        ? {
+            message: error.message,
+            stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined,
+          }
+        : { message: 'Unknown error' };
+    return NextResponse.json({ error: 'Erro ao atualizar evento', details }, { status: 500 });
   }
 }
 

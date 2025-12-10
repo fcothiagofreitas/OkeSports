@@ -90,6 +90,11 @@ export async function GET(
       totalRegistrations: event._count.registrations,
       isRegistrationOpen,
       status: event.status,
+      landingSellingPoints: event.landingSellingPoints,
+      landingAbout: event.landingAbout,
+      landingFaq: event.landingFaq,
+      supportEmail: event.supportEmail,
+      supportWhatsapp: event.supportWhatsapp,
     };
 
     return NextResponse.json(publicEvent);

@@ -235,14 +235,6 @@ export default function InscricaoPage() {
     }
   };
 
-  useEffect(() => {
-    // Se já existe inscrição pendente, enviar direto para o checkout
-    // para evitar que o atleta tenha que refazer a escolha da modalidade.
-    if (existingRegistration && existingRegistration.paymentStatus === 'PENDING' && !isLoading) {
-      void handlePayment();
-    }
-  }, [existingRegistration, isLoading]);
-
   if (loadingEvent || checkingRegistration) {
     return (
       <div className="min-h-screen bg-[hsl(var(--gray-100))] flex items-center justify-center">

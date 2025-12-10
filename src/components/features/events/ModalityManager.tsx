@@ -107,10 +107,14 @@ export function ModalityManager({ eventId }: ModalityManagerProps) {
       // Converter preço de centavos para reais antes de enviar
       // Se for gratuita, setar preço como 0
       const { isFree: _, ...dataWithoutIsFree } = data;
-      const payload = {
+      const payload: Record<string, unknown> = {
         ...dataWithoutIsFree,
         price: isFree ? 0 : data.price / 100,
       };
+
+      if (editingId && payload.maxSlots === undefined) {
+        payload.maxSlots = null;
+      }
 
       console.log('📤 Payload enviado:', payload);
 

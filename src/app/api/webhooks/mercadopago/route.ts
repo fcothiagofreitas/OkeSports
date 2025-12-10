@@ -26,7 +26,8 @@ function verifySignature({
 }): boolean {
   const secret = process.env.MP_WEBHOOK_SECRET;
   if (!secret || !signatureHeader) {
-    return true;
+    console.warn('Webhook MP sem assinatura ou segredo configurado');
+    return false;
   }
 
   const tsMatch = signatureHeader.match(/ts=(\d+)/);

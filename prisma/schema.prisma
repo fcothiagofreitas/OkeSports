@@ -152,6 +152,11 @@ model Event {
   maxRegistrations Int? // Limite total de vagas (null = ilimitado)
   allowGroupReg    Boolean     @default(true) // Permitir inscrever terceiros
   maxGroupSize     Int         @default(10) // Limite de pessoas por compra
+  landingSellingPoints Json?
+  landingAbout        Json?
+  landingFaq          Json?
+  supportEmail        String?
+  supportWhatsapp     String?
 
   // DNS Customizado (futuro)
   customDomain String? @unique

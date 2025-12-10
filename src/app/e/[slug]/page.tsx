@@ -1,20 +1,13 @@
 import { notFound } from 'next/navigation';
-import {
-  Calendar,
-  MapPin,
-  Users,
-  DollarSign,
-  Clock,
-  Trophy,
-  ShieldCheck,
-  HeartPulse,
-  ArrowRight,
-  Share2,
-  AlertTriangle,
-} from 'lucide-react';
+import { Calendar, MapPin, Users, DollarSign, ArrowRight, Share2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { RegistrationButton } from '@/components/events/RegistrationButton';
+import { LandingIcon } from '@/components/events/LandingIcon';
+import type { LandingIconKey } from '@/constants/landingIcons';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 interface EventPageProps {
   params: Promise<{
@@ -27,7 +20,7 @@ async function getEvent(slug: string) {
 
   try {
     const res = await fetch(`${baseUrl}/api/events/by-slug/${slug}`, {
-      next: { revalidate: 60 }, // Revalidar a cada 60 segundos
+      cache: 'no-store',
     });
 
     if (!res.ok) {
@@ -69,38 +62,73 @@ export default async function EventPublicPage({ params }: EventPageProps) {
     (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '') + `/e/${event.slug}`;
   const heroModalities = event.modalities;
 
-  const sellingPoints = [
+  const defaultSellingPoints = [
     {
-      icon: Trophy,
+      icon: 'trophy' as LandingIconKey,
       title: 'Percurso premiado',
       description: 'Circuito oficial com largada rápida e chegada cinematográfica.',
     },
     {
-      icon: ShieldCheck,
+      icon: 'shield' as LandingIconKey,
       title: 'Segurança completa',
       description: 'Staff, sinalização e apoio médico em todo o trajeto.',
     },
     {
-      icon: HeartPulse,
+      icon: 'heart' as LandingIconKey,
       title: 'Experiência completa',
       description: 'Kit premium, pós-prova com ativações e cobertura fotográfica.',
     },
   ];
 
-  const faq = [
-    {
-      question: 'Como funciona a retirada de kits?',
-      answer: 'Você receberá o e-mail com local e horários assim que a inscrição for confirmada.',
-    },
-    {
-      question: 'Posso transferir minha inscrição?',
-      answer: 'Sim, até 7 dias antes do evento. Solicite via suporte do organizador.',
-    },
-    {
-      question: 'Quais são as formas de pagamento?',
-      answer: 'Cartão de crédito, PIX e boleto (quando disponível).',
-    },
+  const hasCustomSellingPoints = Array.isArray(event.landingSellingPoints);
+  const sellingPoints = hasCustomSellingPoints ? event.landingSellingPoints : defaultSellingPoints;
+  const showSellingPoints = hasCustomSellingPoints ? sellingPoints.length > 0 : true;
+
+  const landingAbout = event.landingAbout || {};
+  const aboutDescription =
+    landingAbout.description !== undefined ? landingAbout.description : event.description;
+
+  const defaultIncludes = [
+    'Camiseta oficial e número de peito',
+    'Hidratação e suporte médico',
+    'Medalha finisher exclusiva',
+    'Fotos oficiais (quando disponíveis)',
   ];
+  const hasCustomIncludes = Array.isArray(landingAbout.includes);
+  const includesList = hasCustomIncludes ? landingAbout.includes : defaultIncludes;
+  const showIncludes = hasCustomIncludes ? includesList.length > 0 : true;
+
+  const defaultTips = [
+    'Chegue com pelo menos 1h de antecedência.',
+    'Opte por transporte compartilhado para evitar bloqueios.',
+    'Siga as orientações de staff e placas de acesso.',
+  ];
+  const hasCustomTips = Array.isArray(landingAbout.tips);
+  const tipsList = hasCustomTips ? landingAbout.tips : defaultTips;
+  const showTips = hasCustomTips ? tipsList.length > 0 : true;
+
+  const hasCustomFaq = Array.isArray(event.landingFaq);
+  const faq = hasCustomFaq
+    ? event.landingFaq
+    : [
+        {
+          question: 'Como funciona a retirada de kits?',
+          answer: 'Você receberá o e-mail com local e horários assim que a inscrição for confirmada.',
+        },
+        {
+          question: 'Posso transferir minha inscrição?',
+          answer: 'Sim, até 7 dias antes do evento. Solicite via suporte do organizador.',
+        },
+        {
+          question: 'Quais são as formas de pagamento?',
+          answer: 'Cartão de crédito, PIX e boleto (quando disponível).',
+        },
+      ];
+  const showFaq = hasCustomFaq ? faq.length > 0 : true;
+
+  const supportEmail = event.supportEmail || 'contato@okesports.com';
+  const supportWhatsapp = event.supportWhatsapp;
+  const whatsappLink = supportWhatsapp ? `https://wa.me/${supportWhatsapp.replace(/\D/g, '')}` : null;
 
   return (
     <div className="min-h-screen bg-[hsl(var(--gray-50))]">
@@ -204,19 +232,28 @@ export default async function EventPublicPage({ params }: EventPageProps) {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 lg:px-10 py-12 space-y-16">
-        <section className="grid gap-6 md:grid-cols-3">
-          {sellingPoints.map((point) => (
-            <Card key={point.title} className="border-[hsl(var(--gray-200))] shadow-sm rounded-3xl">
-              <CardContent className="pt-6">
-                <div className="h-12 w-12 rounded-full bg-[hsl(var(--accent-pink))]/10 flex items-center justify-center mb-4">
-                  <point.icon className="h-6 w-6 text-[hsl(var(--accent-pink))]" />
-                </div>
-                <h3 className="text-lg font-semibold text-[hsl(var(--dark))] mb-2">{point.title}</h3>
-                <p className="text-[hsl(var(--gray-600))] text-sm">{point.description}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </section>
+        {showSellingPoints && (
+          <section className="grid gap-6 md:grid-cols-3">
+            {sellingPoints.map((point: any, index: number) => {
+              const iconKey = typeof point.icon === 'string' ? (point.icon as LandingIconKey) : undefined;
+              const fallbackIconKey = defaultSellingPoints[index % defaultSellingPoints.length].icon;
+              return (
+                <Card key={point.title} className="border-[hsl(var(--gray-200))] shadow-sm rounded-3xl">
+                  <CardContent className="pt-6">
+                    <div className="h-12 w-12 rounded-full bg-[hsl(var(--accent-pink))]/10 flex items-center justify-center mb-4">
+                      <LandingIcon
+                        iconKey={iconKey || fallbackIconKey}
+                        className="h-6 w-6 text-[hsl(var(--accent-pink))]"
+                      />
+                    </div>
+                    <h3 className="text-lg font-semibold text-[hsl(var(--dark))] mb-2">{point.title}</h3>
+                    <p className="text-[hsl(var(--gray-600))] text-sm">{point.description}</p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </section>
+        )}
 
         <section className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
           <Card className="shadow-sm border-[hsl(var(--gray-200))] rounded-3xl">
@@ -224,7 +261,7 @@ export default async function EventPublicPage({ params }: EventPageProps) {
               <CardTitle>Sobre o evento</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6 text-[hsl(var(--gray-700))]">
-              <p className="whitespace-pre-wrap leading-relaxed">{event.description}</p>
+              <p className="whitespace-pre-wrap leading-relaxed">{aboutDescription}</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="rounded-2xl border border-[hsl(var(--gray-200))] p-4">
                   <p className="text-xs uppercase tracking-[0.3em] text-[hsl(var(--gray-500))] mb-2">
@@ -253,17 +290,16 @@ export default async function EventPublicPage({ params }: EventPageProps) {
                     </li>
                   </ul>
                 </div>
-                <div className="rounded-2xl border border-[hsl(var(--gray-200))] p-4">
-                  <p className="text-xs uppercase tracking-[0.3em] text-[hsl(var(--gray-500))] mb-2">
-                    Inclui
-                  </p>
-                  <ul className="space-y-2 text-sm text-[hsl(var(--gray-600))]">
-                    <li>• Camiseta oficial e número de peito</li>
-                    <li>• Hidratação e suporte médico</li>
-                    <li>• Medalha finisher exclusiva</li>
-                    <li>• Fotos oficiais (quando disponíveis)</li>
-                  </ul>
-                </div>
+                {showIncludes && (
+                  <div className="rounded-2xl border border-[hsl(var(--gray-200))] p-4">
+                    <p className="text-xs uppercase tracking-[0.3em] text-[hsl(var(--gray-500))] mb-2">Inclui</p>
+                    <ul className="space-y-2 text-sm text-[hsl(var(--gray-600))]">
+                      {includesList.map((item: string, index: number) => (
+                        <li key={`${item}-${index}`}>• {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -286,12 +322,14 @@ export default async function EventPublicPage({ params }: EventPageProps) {
                   <p className="text-[hsl(var(--gray-500))]">Local a ser divulgado em breve.</p>
                 )}
               </div>
-              <div className="rounded-2xl border border-[hsl(var(--gray-200))] p-4 bg-white space-y-3 text-sm text-[hsl(var(--gray-600))]">
-                <p className="font-semibold text-[hsl(var(--dark))]">Dicas rápidas</p>
-                <p>• Chegue com pelo menos 1h de antecedência.</p>
-                <p>• Opte por transporte compartilhado para evitar bloqueios.</p>
-                <p>• Siga as orientações de staff e placas de acesso.</p>
-              </div>
+              {showTips && (
+                <div className="rounded-2xl border border-[hsl(var(--gray-200))] p-4 bg-white space-y-3 text-sm text-[hsl(var(--gray-600))]">
+                  <p className="font-semibold text-[hsl(var(--dark))]">Dicas rápidas</p>
+                  {tipsList.map((tip: string, index: number) => (
+                    <p key={`${tip}-${index}`}>• {tip}</p>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </section>
@@ -312,38 +350,52 @@ export default async function EventPublicPage({ params }: EventPageProps) {
           </div>
         )}
 
-        <section>
-          <div className="flex flex-col gap-3 mb-6">
-            <p className="text-sm uppercase tracking-[0.3em] text-[hsl(var(--gray-500))]">FAQ</p>
-            <h2 className="text-3xl font-bold text-[hsl(var(--dark))]">Dúvidas frequentes</h2>
-          </div>
-          <div className="space-y-4">
-            {faq.map((item) => (
-              <details
-                key={item.question}
-                className="rounded-2xl border border-[hsl(var(--gray-200))] bg-white p-5 shadow-sm"
-              >
-                <summary className="cursor-pointer text-lg font-semibold text-[hsl(var(--dark))]">
-                  {item.question}
-                </summary>
-                <p className="mt-3 text-[hsl(var(--gray-600))]">{item.answer}</p>
-              </details>
-            ))}
-          </div>
-        </section>
+        {showFaq && (
+          <section>
+            <div className="flex flex-col gap-3 mb-6">
+              <p className="text-sm uppercase tracking-[0.3em] text-[hsl(var(--gray-500))]">FAQ</p>
+              <h2 className="text-3xl font-bold text-[hsl(var(--dark))]">Dúvidas frequentes</h2>
+            </div>
+            <div className="space-y-4">
+              {faq.map((item: any) => (
+                <details
+                  key={item.question}
+                  className="rounded-2xl border border-[hsl(var(--gray-200))] bg-white p-5 shadow-sm"
+                >
+                  <summary className="cursor-pointer text-lg font-semibold text-[hsl(var(--dark))]">
+                    {item.question}
+                  </summary>
+                  <p className="mt-3 text-[hsl(var(--gray-600))]">{item.answer}</p>
+                </details>
+              ))}
+            </div>
+          </section>
+        )}
 
-        <div className="text-center border border-dashed border-[hsl(var(--gray-300))] rounded-3xl p-8">
+        <div className="text-center border border-dashed border-[hsl(var(--gray-300))] rounded-3xl p-8 space-y-4">
           <p className="text-sm uppercase tracking-[0.3em] text-[hsl(var(--gray-500))] mb-2">Precisa de ajuda?</p>
-          <h3 className="text-2xl font-semibold text-[hsl(var(--dark))] mb-4">Fale com nossa equipe</h3>
-          <p className="text-[hsl(var(--gray-600))] mb-6">
+          <h3 className="text-2xl font-semibold text-[hsl(var(--dark))]">Fale com nossa equipe</h3>
+          <p className="text-[hsl(var(--gray-600))]">
             Tire dúvidas sobre modalidades, pagamentos ou suporte no dia da prova.
           </p>
-          <a
-            href="mailto:contato@okesports.com?subject=Ajuda%20com%20inscrição"
-            className="inline-flex items-center justify-center rounded-full bg-[hsl(var(--dark))] px-6 py-3 text-white text-sm font-semibold hover:bg-black"
-          >
-            Enviar e-mail
-          </a>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <a
+              href={`mailto:${supportEmail}?subject=Ajuda%20com%20inscrição`}
+              className="inline-flex items-center justify-center rounded-full bg-[hsl(var(--dark))] px-6 py-3 text-white text-sm font-semibold hover:bg-black"
+            >
+              Enviar e-mail
+            </a>
+            {whatsappLink && (
+              <a
+                href={whatsappLink}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center rounded-full border border-[hsl(var(--dark))] px-6 py-3 text-sm font-semibold text-[hsl(var(--dark))] hover:bg-[hsl(var(--dark))] hover:text-white"
+              >
+                WhatsApp
+              </a>
+            )}
+          </div>
         </div>
       </main>
 

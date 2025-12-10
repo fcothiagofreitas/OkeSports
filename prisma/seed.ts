@@ -1,4 +1,4 @@
-import { PrismaClient, Gender, EventStatus } from '@prisma/client';
+import { PrismaClient, Gender, EventStatus, Prisma } from '@prisma/client';
 import { hash } from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -109,6 +109,49 @@ async function main() {
           },
         ],
       },
+      landingSellingPoints: [
+        {
+          title: 'Percurso premiado',
+          description: 'Circuito oficial com largada rápida e chegada cinematográfica.',
+          icon: 'trophy',
+        },
+        {
+          title: 'Segurança completa',
+          description: 'Staff, sinalização e apoio médico em todo o trajeto.',
+          icon: 'shield',
+        },
+        {
+          title: 'Experiência completa',
+          description: 'Kit premium, pós-prova com ativações e cobertura fotográfica.',
+          icon: 'heart',
+        },
+      ] as Prisma.JsonArray,
+      landingAbout: {
+        description:
+          'Evento de corrida de rua pensado para atletas iniciantes e intermediários com todo o suporte de prova oficial.',
+        includes: ['Camiseta oficial', 'Medalha finisher', 'Hidratação e frutas', 'Fotos profissionais'],
+        tips: [
+          'Chegue com 1h de antecedência para retirar seu kit.',
+          'Use protetor solar e mantenha a hidratação.',
+          'Planeje seu deslocamento considerando os bloqueios da orla.',
+        ],
+      } as Prisma.JsonValue,
+      landingFaq: [
+        {
+          question: 'Como funciona a retirada de kits?',
+          answer: 'No dia anterior à prova, das 9h às 18h, na Arena Okê Sports (Praia de Iracema).',
+        },
+        {
+          question: 'Posso transferir minha inscrição?',
+          answer: 'Sim, até 7 dias antes do evento pelo painel do participante.',
+        },
+        {
+          question: 'Quais são as formas de pagamento?',
+          answer: 'PIX, cartão de crédito em até 2x e boleto bancário.',
+        },
+      ] as Prisma.JsonArray,
+      supportEmail: 'contato@okesports.com',
+      supportWhatsapp: '+5585981907619',
     },
     include: {
       modalities: true,
@@ -140,6 +183,26 @@ async function main() {
           cep: '60000000',
         },
       },
+      landingSellingPoints: [
+        {
+          title: 'Percurso urbano',
+          description: 'Trajeto plano pelo centro histórico.',
+          icon: 'map',
+        },
+      ] as Prisma.JsonArray,
+      landingAbout: {
+        description: 'Use este evento em rascunho para testar o editor de landing.',
+        includes: ['Cronograma configurável', 'FAQ customizado'],
+        tips: ['Edite tudo no painel do organizador.'],
+      } as Prisma.JsonValue,
+      landingFaq: [
+        {
+          question: 'Quando esse evento será publicado?',
+          answer: 'Assim que você finalizar os ajustes no painel.',
+        },
+      ] as Prisma.JsonArray,
+      supportEmail: 'contato@okesports.com',
+      supportWhatsapp: '+5585981907619',
     },
   });
 
