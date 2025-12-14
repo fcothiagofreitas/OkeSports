@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/middleware/auth';
 import prisma from '@/lib/db';
-import { createCouponSchema } from '@/lib/validations/modality';
+import { createCouponSchema, updateCouponSchema } from '@/lib/validations/coupon';
 import { ZodError } from 'zod';
+import { Prisma } from '@prisma/client';
+
+// ============================================
+// POST /api/events/[eventId]/coupons
+// ============================================
+// Cria um novo cupom no evento
 
 async function createCoupon(
   request: NextRequest & { user: { userId: string } },
@@ -13,37 +19,53 @@ async function createCoupon(
     const { eventId } = await params;
     const body = await request.json();
 
+    // Verificar se evento existe e pertence ao usuário
     const event = await prisma.event.findUnique({
       where: { id: eventId },
       select: { organizerId: true },
     });
 
-    if (!event || event.organizerId !== userId) {
-      return NextResponse.json({ error: 'Evento não encontrado ou sem permissão' }, { status: 404 });
+    if (!event) {
+      return NextResponse.json({ error: 'Evento não encontrado' }, { status: 404 });
     }
 
-    const validatedData = createCouponSchema.parse({ ...body, eventId });
-
-    // Verificar se código já existe no evento
-    const existing = await prisma.coupon.findFirst({
-      where: { eventId, code: validatedData.code },
-    });
-
-    if (existing) {
-      return NextResponse.json({ error: 'Código de cupom já existe neste evento' }, { status: 400 });
+    if (event.organizerId !== userId) {
+      return NextResponse.json(
+        { error: 'Você não tem permissão para adicionar cupons a este evento' },
+        { status: 403 }
+      );
     }
 
-    const coupon = await prisma.coupon.create({
-      data: {
+    // Validar dados
+    const validatedData = createCouponSchema.parse(body);
+
+    // Verificar se código já existe para este evento
+    const existingCoupon = await prisma.coupon.findFirst({
+      where: {
         eventId,
         code: validatedData.code,
+      },
+    });
+
+    if (existingCoupon) {
+      return NextResponse.json(
+        { error: 'Já existe um cupom com este código para este evento' },
+        { status: 409 }
+      );
+    }
+
+    // Criar cupom
+    const coupon = await prisma.coupon.create({
+      data: {
+        event: { connect: { id: eventId } },
+        code: validatedData.code,
         discountType: validatedData.discountType,
-        discountValue: validatedData.discountValue,
-        startDate: new Date(validatedData.startDate),
-        endDate: new Date(validatedData.endDate),
+        discountValue: new Prisma.Decimal(validatedData.discountValue),
+        startDate: new Date(validatedData.startDate as any),
+        endDate: new Date(validatedData.endDate as any),
         maxUses: validatedData.maxUses,
-        modalityIds: validatedData.modalityIds,
-        minPurchase: validatedData.minPurchase,
+        modalityIds: validatedData.modalityIds || [],
+        minPurchase: validatedData.minPurchase ? new Prisma.Decimal(validatedData.minPurchase) : null,
         active: validatedData.active,
       },
     });
@@ -51,12 +73,21 @@ async function createCoupon(
     return NextResponse.json(coupon, { status: 201 });
   } catch (error) {
     if (error instanceof ZodError) {
-      return NextResponse.json({ error: 'Dados inválidos', details: error.errors }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Dados inválidos', details: error.errors },
+        { status: 400 }
+      );
     }
+
     console.error('Create coupon error:', error);
     return NextResponse.json({ error: 'Erro ao criar cupom' }, { status: 500 });
   }
 }
+
+// ============================================
+// GET /api/events/[eventId]/coupons
+// ============================================
+// Lista cupons do evento
 
 async function listCoupons(
   request: NextRequest & { user: { userId: string } },
@@ -66,18 +97,34 @@ async function listCoupons(
     const { userId } = request.user;
     const { eventId } = await params;
 
+    // Verificar se evento existe e pertence ao usuário
     const event = await prisma.event.findUnique({
       where: { id: eventId },
       select: { organizerId: true },
     });
 
-    if (!event || event.organizerId !== userId) {
-      return NextResponse.json({ error: 'Evento não encontrado ou sem permissão' }, { status: 404 });
+    if (!event) {
+      return NextResponse.json({ error: 'Evento não encontrado' }, { status: 404 });
     }
 
+    if (event.organizerId !== userId) {
+      return NextResponse.json(
+        { error: 'Você não tem permissão para acessar este evento' },
+        { status: 403 }
+      );
+    }
+
+    // Buscar cupons
     const coupons = await prisma.coupon.findMany({
       where: { eventId },
       orderBy: { createdAt: 'desc' },
+      include: {
+        _count: {
+          select: {
+            registrations: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json({ coupons });

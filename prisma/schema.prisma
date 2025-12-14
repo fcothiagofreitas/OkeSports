@@ -169,6 +169,7 @@ model Event {
   batches       Batch[]
   coupons       Coupon[]
   registrations Registration[]
+  kit           Kit?
 
   // Auditoria
   createdAt   DateTime  @default(now())
@@ -270,7 +271,50 @@ enum DiscountType {
 }
 
 // ============================================
-// 6. CUPONS (Coupon)
+// 6. KIT (Kit)
+// ============================================
+
+model Kit {
+  id          String   @id @default(cuid())
+  eventId     String   @unique
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  // Itens do kit (JSON array)
+  items       Json?    // [{ name: "Camiseta", included: true }, { name: "Medalha", included: true }]
+
+  // Tamanhos disponíveis e estoque
+  sizes       KitSizeStock[]
+
+  // Configurações
+  includeShirt Boolean @default(true) // Inclui camiseta no kit
+  shirtRequired Boolean @default(false) // Tamanho é obrigatório
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("kits")
+}
+
+model KitSizeStock {
+  id        String   @id @default(cuid())
+  kitId     String
+  kit       Kit      @relation(fields: [kitId], references: [id], onDelete: Cascade)
+
+  size      String   // PP, P, M, G, GG, XG
+  stock     Int      @default(0) // Estoque disponível
+  reserved  Int      @default(0) // Reservado (inscrições pendentes)
+  sold      Int      @default(0) // Vendido (inscrições confirmadas)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([kitId, size])
+  @@index([kitId])
+  @@map("kit_size_stocks")
+}
+
+// ============================================
+// 7. CUPONS (Coupon)
 // ============================================
 
 model Coupon {
@@ -300,7 +344,7 @@ model Coupon {
 }
 
 // ============================================
-// 7. INSCRIÇÃO (Registration)
+// 8. INSCRIÇÃO (Registration)
 // ============================================
 
 model Registration {

@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import prisma from '@/lib/db';
 import { verifyAccessToken } from '@/lib/auth';
+import { calculatePrice } from '@/lib/pricing';
 
 // Schema de validação
 const createRegistrationSchema = z.object({
   eventId: z.string().cuid(),
   modalityId: z.string().cuid(),
+  couponCode: z.string().optional(),
   shirtSize: z.enum(['PP', 'P', 'M', 'G', 'GG', 'XG']).optional(),
   emergencyContact: z.string().optional(),
   emergencyPhone: z.string().optional(),
@@ -145,14 +147,76 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 9. Calcular valores
-    const basePrice = Number(modality.price);
-    const discount = 0; // TODO: Aplicar cupom se fornecido
-    const subtotal = basePrice - discount;
-    const platformFee = subtotal * 0.10; // 10% de taxa
-    const total = subtotal + platformFee;
+    // 9. Calcular valores usando calculatePrice (aplica lote e cupom automaticamente)
+    const pricing = await calculatePrice(
+      validatedData.eventId,
+      validatedData.modalityId,
+      validatedData.couponCode
+    );
 
-    // 10. Buscar último número de inscrição do evento
+    // 10. Buscar cupom se fornecido e válido
+    let couponId: string | undefined;
+    if (pricing.couponCode) {
+      const coupon = await prisma.coupon.findFirst({
+        where: {
+          eventId: validatedData.eventId,
+          code: pricing.couponCode,
+        },
+      });
+      couponId = coupon?.id;
+    }
+
+    // 10.5. Validar e reservar estoque do kit (se tamanho informado)
+    if (validatedData.shirtSize) {
+      const kit = await prisma.kit.findUnique({
+        where: { eventId: validatedData.eventId },
+        include: {
+          sizes: true,
+        },
+      });
+
+      if (kit) {
+        // Verificar se tamanho é obrigatório
+        if (kit.shirtRequired && !validatedData.shirtSize) {
+          return NextResponse.json(
+            { error: 'Tamanho da camiseta é obrigatório para este evento' },
+            { status: 400 }
+          );
+        }
+
+        // Buscar estoque do tamanho
+        const sizeStock = kit.sizes.find((s) => s.size === validatedData.shirtSize);
+
+        if (!sizeStock) {
+          return NextResponse.json(
+            { error: `Tamanho ${validatedData.shirtSize} não está disponível para este evento` },
+            { status: 400 }
+          );
+        }
+
+        // Calcular disponível
+        const available = sizeStock.stock - sizeStock.reserved - sizeStock.sold;
+
+        if (available <= 0) {
+          return NextResponse.json(
+            { error: `Tamanho ${validatedData.shirtSize} está esgotado` },
+            { status: 400 }
+          );
+        }
+
+        // Reservar estoque (incrementar reserved)
+        await prisma.kitSizeStock.update({
+          where: { id: sizeStock.id },
+          data: {
+            reserved: {
+              increment: 1,
+            },
+          },
+        });
+      }
+    }
+
+    // 11. Buscar último número de inscrição do evento
     const lastRegistration = await prisma.registration.findFirst({
       where: { eventId: event.id },
       orderBy: { registrationNumber: 'desc' },
@@ -161,19 +225,20 @@ export async function POST(request: NextRequest) {
 
     const registrationNumber = (lastRegistration?.registrationNumber || 0) + 1;
 
-    // 11. Criar inscrição
+    // 12. Criar inscrição
     const registration = await prisma.registration.create({
       data: {
         eventId: event.id,
         modalityId: modality.id,
         participantId,
         buyerId: participantId,
+        couponId,
         registrationNumber,
-        basePrice,
-        discount,
-        subtotal,
-        platformFee,
-        total,
+        basePrice: pricing.basePrice,
+        discount: pricing.batchDiscount + pricing.couponDiscount,
+        subtotal: pricing.subtotal,
+        platformFee: pricing.platformFee,
+        total: pricing.total,
         status: 'PENDING',
         paymentStatus: 'PENDING',
         shirtSize: validatedData.shirtSize,
@@ -205,7 +270,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // 12. Retornar dados da inscrição
+    // 13. Retornar dados da inscrição
     return NextResponse.json(
       {
         registration: {

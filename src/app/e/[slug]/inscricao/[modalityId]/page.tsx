@@ -15,6 +15,7 @@ import { useParticipantAuthStore } from '@/stores/participantAuthStore';
 import { ArrowLeft, Loader2, CheckCircle2, Clock, XCircle } from 'lucide-react';
 
 const registrationSchema = z.object({
+  couponCode: z.string().optional(),
   shirtSize: z.enum(['PP', 'P', 'M', 'G', 'GG', 'XG']).optional(),
   emergencyContact: z.string().optional(),
   emergencyPhone: z.string().optional(),
@@ -41,6 +42,12 @@ interface EventData {
     description: string;
     price: number;
   };
+  kit?: {
+    includeShirt: boolean;
+    shirtRequired: boolean;
+    items?: Array<{ name: string; included: boolean }> | null;
+    availableSizes?: Array<{ size: string; available: number }>;
+  } | null;
 }
 
 export default function InscricaoPage() {
@@ -56,6 +63,9 @@ export default function InscricaoPage() {
   const [loadingEvent, setLoadingEvent] = useState(true);
   const [existingRegistration, setExistingRegistration] = useState<any>(null);
   const [checkingRegistration, setCheckingRegistration] = useState(true);
+  const [couponCode, setCouponCode] = useState('');
+  const [pricing, setPricing] = useState<any>(null);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
 
   const {
     register,
@@ -106,6 +116,9 @@ export default function InscricaoPage() {
             price: modality.price,
           },
         });
+
+        // Calcular preço inicial (sem cupom)
+        await validateCoupon('');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erro ao carregar dados');
       } finally {
@@ -115,6 +128,34 @@ export default function InscricaoPage() {
 
     fetchEventData();
   }, [slug, modalityId]);
+
+  // Validar cupom e atualizar preço
+  const validateCoupon = async (code: string) => {
+    if (!eventData) return;
+
+    setValidatingCoupon(true);
+    try {
+      const response = await fetch(`/api/events/${eventData.id}/coupons/validate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          couponCode: code || undefined,
+          modalityId: eventData.modality.id,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.pricing) {
+        setPricing(data.pricing);
+      }
+    } catch (err) {
+      console.error('Erro ao validar cupom:', err);
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
 
   // Verificar se já existe inscrição
   useEffect(() => {
@@ -194,6 +235,7 @@ export default function InscricaoPage() {
         body: JSON.stringify({
           eventId: eventData.id,
           modalityId: eventData.modality.id,
+          couponCode: couponCode || undefined,
           ...data,
         }),
       });
@@ -432,12 +474,65 @@ export default function InscricaoPage() {
                   year: 'numeric',
                 })}
               </p>
-              <p className="text-lg font-bold text-[hsl(var(--accent-pink))] mt-2">
-                {new Intl.NumberFormat('pt-BR', {
-                  style: 'currency',
-                  currency: 'BRL',
-                }).format(eventData.modality.price)}
-              </p>
+              
+              {/* Preço com descontos */}
+              {pricing ? (
+                <div className="mt-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-[hsl(var(--gray-600))]">Preço base:</span>
+                    <span>{new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    }).format(pricing.basePrice)}</span>
+                  </div>
+                  {pricing.batchDiscount > 0 && (
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>Desconto ({pricing.batchName}):</span>
+                      <span>- {new Intl.NumberFormat('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      }).format(pricing.batchDiscount)}</span>
+                    </div>
+                  )}
+                  {pricing.couponDiscount > 0 && (
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>Cupom ({pricing.couponCode}):</span>
+                      <span>- {new Intl.NumberFormat('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      }).format(pricing.couponDiscount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm pt-2 border-t border-[hsl(var(--gray-200))]">
+                    <span className="text-[hsl(var(--gray-600))]">Subtotal:</span>
+                    <span>{new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    }).format(pricing.subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-[hsl(var(--gray-600))]">Taxa de serviço (10%):</span>
+                    <span>{new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    }).format(pricing.platformFee)}</span>
+                  </div>
+                  <div className="flex justify-between text-lg font-bold text-[hsl(var(--accent-pink))] pt-2 border-t border-[hsl(var(--gray-200))]">
+                    <span>Total:</span>
+                    <span>{new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    }).format(pricing.total)}</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-lg font-bold text-[hsl(var(--accent-pink))] mt-2">
+                  {new Intl.NumberFormat('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                  }).format(eventData.modality.price)}
+                </p>
+              )}
             </div>
 
             {/* Dados do Participante */}
@@ -458,27 +553,96 @@ export default function InscricaoPage() {
 
             {/* Formulário */}
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              {/* Cupom de Desconto */}
+              <div className="space-y-2">
+                <Label htmlFor="couponCode">Cupom de Desconto (Opcional)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="couponCode"
+                    placeholder="Digite o código do cupom"
+                    value={couponCode}
+                    onChange={(e) => {
+                      const code = e.target.value.toUpperCase();
+                      setCouponCode(code);
+                      if (code.length >= 3) {
+                        validateCoupon(code);
+                      } else if (code.length === 0) {
+                        validateCoupon('');
+                      }
+                    }}
+                    disabled={isLoading || validatingCoupon}
+                    className="uppercase"
+                  />
+                  {validatingCoupon && (
+                    <Loader2 className="h-4 w-4 animate-spin text-[hsl(var(--gray-400))] self-center" />
+                  )}
+                </div>
+                {pricing?.couponCode && (
+                  <p className="text-sm text-green-600">
+                    ✓ Cupom {pricing.couponCode} aplicado! Desconto de{' '}
+                    {new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    }).format(pricing.couponDiscount)}
+                  </p>
+                )}
+                {couponCode && !pricing?.couponCode && !validatingCoupon && (
+                  <p className="text-sm text-red-600">
+                    Cupom inválido ou não aplicável para esta modalidade
+                  </p>
+                )}
+              </div>
+
               {/* Campos Opcionais */}
               <div className="space-y-4">
                 <h4 className="font-medium text-[hsl(var(--dark))]">Informações Adicionais (Opcionais)</h4>
 
-                <div className="space-y-2">
-                  <Label htmlFor="shirtSize">Tamanho da Camisa</Label>
-                  <select
-                    id="shirtSize"
-                    {...register('shirtSize')}
-                    className="w-full px-3 py-2 border border-[hsl(var(--gray-300))] rounded-md"
-                    disabled={isLoading}
-                  >
-                    <option value="">Selecione (opcional)</option>
-                    <option value="PP">PP</option>
-                    <option value="P">P</option>
-                    <option value="M">M</option>
-                    <option value="G">G</option>
-                    <option value="GG">GG</option>
-                    <option value="XG">XG</option>
-                  </select>
-                </div>
+                {eventData?.kit?.includeShirt && (
+                  <div className="space-y-2">
+                    <Label htmlFor="shirtSize">
+                      Tamanho da Camisa
+                      {eventData.kit.shirtRequired && <span className="text-red-600 ml-1">*</span>}
+                    </Label>
+                    <select
+                      id="shirtSize"
+                      {...register('shirtSize', {
+                        required: eventData.kit.shirtRequired
+                          ? 'Tamanho da camiseta é obrigatório'
+                          : false,
+                      })}
+                      className="w-full px-3 py-2 border border-[hsl(var(--gray-300))] rounded-md"
+                      disabled={isLoading}
+                    >
+                      <option value="">
+                        {eventData.kit.shirtRequired ? 'Selecione o tamanho' : 'Selecione (opcional)'}
+                      </option>
+                      {eventData.kit.availableSizes && eventData.kit.availableSizes.length > 0 ? (
+                        eventData.kit.availableSizes.map((size) => (
+                          <option key={size.size} value={size.size}>
+                            {size.size} {size.available > 0 ? `(${size.available} disponível${size.available > 1 ? 'eis' : ''})` : '(Esgotado)'}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="PP">PP</option>
+                          <option value="P">P</option>
+                          <option value="M">M</option>
+                          <option value="G">G</option>
+                          <option value="GG">GG</option>
+                          <option value="XG">XG</option>
+                        </>
+                      )}
+                    </select>
+                    {errors.shirtSize && (
+                      <p className="text-sm text-red-600">{errors.shirtSize.message}</p>
+                    )}
+                    {eventData.kit.items && eventData.kit.items.length > 0 && (
+                      <p className="text-xs text-[hsl(var(--gray-600))] mt-1">
+                        Kit inclui: {eventData.kit.items.filter((item) => item.included).map((item) => item.name).join(', ')}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="emergencyContact">Contato de Emergência</Label>

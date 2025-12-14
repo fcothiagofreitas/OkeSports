@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
+import { getActiveBatch } from '@/lib/pricing';
 
 // ============================================
 // GET /api/events/by-slug/[slug]
@@ -16,7 +17,7 @@ export async function GET(
     const { slug } = await params;
 
     // Buscar evento público
-    const event = await prisma.event.findUnique({
+    const event = await prisma.event.findFirst({
       where: {
         slug,
         status: 'PUBLISHED', // Apenas eventos publicados
@@ -34,6 +35,15 @@ export async function GET(
             _count: {
               select: {
                 registrations: true,
+              },
+            },
+          },
+        },
+        kit: {
+          include: {
+            sizes: {
+              orderBy: {
+                size: 'asc',
               },
             },
           },
@@ -69,6 +79,19 @@ export async function GET(
     const isRegistrationOpen =
       now >= event.registrationStart && now <= event.registrationEnd;
 
+    // Buscar lote ativo
+    const activeBatch = await getActiveBatch(event.id);
+    const activeBatchInfo = activeBatch
+      ? {
+          id: activeBatch.id,
+          name: activeBatch.name,
+          discountType: activeBatch.discountType,
+          discountValue: activeBatch.discountValue
+            ? Number(activeBatch.discountValue)
+            : null,
+        }
+      : null;
+
     // Resposta pública (não expor dados sensíveis)
     const publicEvent = {
       id: event.id,
@@ -95,6 +118,23 @@ export async function GET(
       landingFaq: event.landingFaq,
       supportEmail: event.supportEmail,
       supportWhatsapp: event.supportWhatsapp,
+      activeBatch: activeBatchInfo,
+      kit: event.kit
+        ? {
+            includeShirt: event.kit.includeShirt,
+            shirtRequired: event.kit.shirtRequired,
+            items: event.kit.items,
+            availableSizes: event.kit.sizes
+              .filter((size) => {
+                const available = size.stock - size.reserved - size.sold;
+                return available > 0;
+              })
+              .map((size) => ({
+                size: size.size,
+                available: size.stock - size.reserved - size.sold,
+              })),
+          }
+        : null,
     };
 
     return NextResponse.json(publicEvent);

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/middleware/auth';
 import prisma from '@/lib/db';
-import { createBatchSchema } from '@/lib/validations/modality';
+import { createBatchSchema, updateBatchSchema } from '@/lib/validations/batch';
 import { ZodError } from 'zod';
+import { Prisma } from '@prisma/client';
 
 // ============================================
 // POST /api/events/[eventId]/batches
@@ -36,25 +37,28 @@ async function createBatch(
     }
 
     // Validar dados
-    const validatedData = createBatchSchema.parse({ ...body, eventId });
+    const validatedData = createBatchSchema.parse(body);
 
-    // Converter datas se fornecidas
-    const startDate = validatedData.startDate ? new Date(validatedData.startDate) : null;
-    const endDate = validatedData.endDate ? new Date(validatedData.endDate) : null;
+    // Converter datas se necessário
+    const batchData: Prisma.BatchCreateInput = {
+      event: { connect: { id: eventId } },
+      name: validatedData.name,
+      type: validatedData.type,
+      active: validatedData.active,
+      discountType: validatedData.discountType || null,
+      discountValue: validatedData.discountValue ? new Prisma.Decimal(validatedData.discountValue) : null,
+    };
+
+    if (validatedData.type === 'DATE') {
+      batchData.startDate = validatedData.startDate ? new Date(validatedData.startDate as any) : null;
+      batchData.endDate = validatedData.endDate ? new Date(validatedData.endDate as any) : null;
+    } else if (validatedData.type === 'VOLUME') {
+      batchData.maxSales = validatedData.maxSales || null;
+    }
 
     // Criar lote
     const batch = await prisma.batch.create({
-      data: {
-        eventId,
-        name: validatedData.name,
-        type: validatedData.type,
-        startDate,
-        endDate,
-        maxSales: validatedData.maxSales,
-        discountType: validatedData.discountType,
-        discountValue: validatedData.discountValue,
-        active: validatedData.active,
-      },
+      data: batchData,
     });
 
     return NextResponse.json(batch, { status: 201 });
@@ -104,7 +108,10 @@ async function listBatches(
     // Buscar lotes
     const batches = await prisma.batch.findMany({
       where: { eventId },
-      orderBy: { startDate: 'asc' },
+      orderBy: [
+        { startDate: 'asc' },
+        { createdAt: 'asc' },
+      ],
     });
 
     return NextResponse.json({ batches });

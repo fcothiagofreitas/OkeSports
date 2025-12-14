@@ -11,7 +11,7 @@ const PLATFORM_FEE_PERCENTAGE = 0.10; // 10%
 /**
  * Encontra o lote ativo no momento
  */
-async function getActiveBatch(eventId: string) {
+export async function getActiveBatch(eventId: string) {
   const now = new Date();
 
   // Buscar lotes ativos do evento

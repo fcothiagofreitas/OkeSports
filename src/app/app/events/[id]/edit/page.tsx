@@ -24,6 +24,10 @@ import { ArrowLeft, Calendar, Users, ExternalLink, Copy, Check, Trash2, Plus } f
 import { apiGet, apiPatch, ApiError } from '@/lib/api';
 import { DashboardNav } from '@/components/layout/DashboardNav';
 import { ModalityManager } from '@/components/features/events/ModalityManager';
+import { BatchManager } from '@/components/features/events/BatchManager';
+import { CouponManager } from '@/components/features/events/CouponManager';
+import { KitManager } from '@/components/features/events/KitManager';
+import { RegistrationsManager } from '@/components/features/events/RegistrationsManager';
 import { IconSelector } from '@/components/features/events/IconSelector';
 import { getIconByKey } from '@/constants/landingIcons';
 import { cn } from '@/lib/utils';
@@ -113,7 +117,7 @@ interface LandingFaqItem {
   answer: string;
 }
 
-type TabType = 'info' | 'landing' | 'modalities' | 'batches' | 'coupons';
+type TabType = 'overview' | 'info' | 'landing' | 'modalities' | 'batches' | 'coupons' | 'kit' | 'registrations';
 
 export default function EditEventPage() {
   const router = useRouter();
@@ -123,7 +127,7 @@ export default function EditEventPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('info');
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [copied, setCopied] = useState(false);
   const [sellingPoints, setSellingPoints] = useState<LandingSellingPoint[]>([]);
   const [aboutDescription, setAboutDescription] = useState('');
@@ -475,6 +479,16 @@ export default function EditEventPage() {
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
           <div className="flex gap-1">
             <button
+              onClick={() => setActiveTab('overview')}
+              className={`px-6 py-3 font-medium text-sm transition-colors ${
+                activeTab === 'overview'
+                  ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
+                  : 'text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
+              }`}
+            >
+              Geral
+            </button>
+            <button
               onClick={() => setActiveTab('info')}
               className={`px-6 py-3 font-medium text-sm transition-colors ${
                 activeTab === 'info'
@@ -504,11 +518,45 @@ export default function EditEventPage() {
             >
               Modalidades ({event?._count.modalities || 0})
             </button>
-            <button className="px-6 py-3 font-medium text-sm text-[hsl(var(--gray-400))] cursor-not-allowed">
-              Lotes (Em breve)
+            <button
+              onClick={() => setActiveTab('batches')}
+              className={`px-6 py-3 font-medium text-sm transition-colors ${
+                activeTab === 'batches'
+                  ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
+                  : 'text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
+              }`}
+            >
+              Lotes
             </button>
-            <button className="px-6 py-3 font-medium text-sm text-[hsl(var(--gray-400))] cursor-not-allowed">
-              Cupons (Em breve)
+            <button
+              onClick={() => setActiveTab('coupons')}
+              className={`px-6 py-3 font-medium text-sm transition-colors ${
+                activeTab === 'coupons'
+                  ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
+                  : 'text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
+              }`}
+            >
+              Cupons
+            </button>
+            <button
+              onClick={() => setActiveTab('kit')}
+              className={`px-6 py-3 font-medium text-sm transition-colors ${
+                activeTab === 'kit'
+                  ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
+                  : 'text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
+              }`}
+            >
+              Kit
+            </button>
+            <button
+              onClick={() => setActiveTab('registrations')}
+              className={`px-6 py-3 font-medium text-sm transition-colors ${
+                activeTab === 'registrations'
+                  ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
+                  : 'text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
+              }`}
+            >
+              Inscritos ({event?._count.registrations || 0})
             </button>
           </div>
         </div>
@@ -516,51 +564,54 @@ export default function EditEventPage() {
 
       {/* Content */}
       <main className="max-w-7xl mx-auto px-6 lg:px-10 py-12">
-        {event && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-xs uppercase tracking-wide text-[hsl(var(--gray-500))]">Inscrições confirmadas</p>
-                <p className="text-3xl font-bold text-[hsl(var(--dark))] mt-2">
-                  {event._count?.registrations ?? 0}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-xs uppercase tracking-wide text-[hsl(var(--gray-500))]">Modalidades</p>
-                <p className="text-3xl font-bold text-[hsl(var(--dark))] mt-2">
-                  {event._count?.modalities ?? 0}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6 space-y-2">
-                <p className="text-xs uppercase tracking-wide text-[hsl(var(--gray-500))]">Ações rápidas</p>
-                <div className="flex flex-col gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={copyPublicLink}
-                    disabled={!event.slug}
-                    className="gap-2"
-                  >
-                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    {copied ? 'Link copiado' : 'Copiar link público'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={openPublicPage}
-                    disabled={!event.slug}
-                    className="gap-2"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    Abrir página pública
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+        {/* Tab: Geral/Overview */}
+        {activeTab === 'overview' && event && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-xs uppercase tracking-wide text-[hsl(var(--gray-500))]">Inscrições confirmadas</p>
+                  <p className="text-3xl font-bold text-[hsl(var(--dark))] mt-2">
+                    {event._count?.registrations ?? 0}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-xs uppercase tracking-wide text-[hsl(var(--gray-500))]">Modalidades</p>
+                  <p className="text-3xl font-bold text-[hsl(var(--dark))] mt-2">
+                    {event._count?.modalities ?? 0}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6 space-y-2">
+                  <p className="text-xs uppercase tracking-wide text-[hsl(var(--gray-500))]">Ações rápidas</p>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={copyPublicLink}
+                      disabled={!event.slug}
+                      className="gap-2"
+                    >
+                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      {copied ? 'Link copiado' : 'Copiar link público'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={openPublicPage}
+                      disabled={!event.slug}
+                      className="gap-2"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Abrir página pública
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         )}
 
@@ -865,18 +916,30 @@ export default function EditEventPage() {
           </Card>
         )}
 
-        {/* Tab: Lotes (Em breve) */}
+        {/* Tab: Lotes */}
         {activeTab === 'batches' && (
-          <Card className="p-12 text-center">
-            <p className="text-[hsl(var(--gray-600))]">Em breve...</p>
+          <Card className="p-6">
+            <BatchManager eventId={params.id as string} />
           </Card>
         )}
 
-        {/* Tab: Cupons (Em breve) */}
+        {/* Tab: Cupons */}
         {activeTab === 'coupons' && (
-          <Card className="p-12 text-center">
-            <p className="text-[hsl(var(--gray-600))]">Em breve...</p>
+          <Card className="p-6">
+            <CouponManager eventId={params.id as string} />
           </Card>
+        )}
+
+        {/* Tab: Kit */}
+        {activeTab === 'kit' && (
+          <Card className="p-6">
+            <KitManager eventId={params.id as string} />
+          </Card>
+        )}
+
+        {/* Tab: Inscrições */}
+        {activeTab === 'registrations' && event && (
+          <RegistrationsManager eventId={params.id as string} accessToken={accessToken || ''} />
         )}
       </main>
     </div>

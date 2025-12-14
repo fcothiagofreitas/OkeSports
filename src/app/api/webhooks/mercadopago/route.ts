@@ -190,6 +190,33 @@ export async function POST(request: NextRequest) {
       // 4. Incrementar slots vendidos da modalidade
       await incrementModalitySoldSlots(registration.modality.id);
 
+      // 5. Atualizar estoque do kit (mover de reserved para sold)
+      if (registration.shirtSize) {
+        const kit = await prisma.kit.findUnique({
+          where: { eventId: registration.eventId },
+          include: {
+            sizes: true,
+          },
+        });
+
+        if (kit) {
+          const sizeStock = kit.sizes.find((s) => s.size === registration.shirtSize);
+          if (sizeStock) {
+            await prisma.kitSizeStock.update({
+              where: { id: sizeStock.id },
+              data: {
+                reserved: {
+                  decrement: 1,
+                },
+                sold: {
+                  increment: 1,
+                },
+              },
+            });
+          }
+        }
+      }
+
       console.log('Pagamento aprovado e processado:', {
         registrationId: registration.id,
         participantEmail: registration.participant.email,
@@ -209,6 +236,30 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({ message: 'Pagamento processado com sucesso' });
     } else if (paymentStatus === 'rejected' || paymentStatus === 'cancelled') {
+      // Liberar estoque reservado se pagamento foi cancelado/rejeitado
+      if (registration.shirtSize) {
+        const kit = await prisma.kit.findUnique({
+          where: { eventId: registration.eventId },
+          include: {
+            sizes: true,
+          },
+        });
+
+        if (kit) {
+          const sizeStock = kit.sizes.find((s) => s.size === registration.shirtSize);
+          if (sizeStock && sizeStock.reserved > 0) {
+            await prisma.kitSizeStock.update({
+              where: { id: sizeStock.id },
+              data: {
+                reserved: {
+                  decrement: 1,
+                },
+              },
+            });
+          }
+        }
+      }
+
       // Atualizar como cancelado
       await prisma.registration.update({
         where: { id: registration.id },

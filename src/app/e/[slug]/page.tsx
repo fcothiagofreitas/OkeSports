@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { RegistrationButton } from '@/components/events/RegistrationButton';
 import { LandingIcon } from '@/components/events/LandingIcon';
 import type { LandingIconKey } from '@/constants/landingIcons';
+import prisma from '@/lib/db';
+import { getActiveBatch } from '@/lib/pricing';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -16,18 +18,124 @@ interface EventPageProps {
 }
 
 async function getEvent(slug: string) {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-
   try {
-    const res = await fetch(`${baseUrl}/api/events/by-slug/${slug}`, {
-      cache: 'no-store',
+    // Buscar evento público diretamente do banco
+    const event = await prisma.event.findFirst({
+      where: {
+        slug,
+        status: 'PUBLISHED', // Apenas eventos publicados
+      },
+      include: {
+        location: true,
+        modalities: {
+          where: {
+            active: true, // Apenas modalidades ativas
+          },
+          orderBy: {
+            price: 'asc',
+          },
+          include: {
+            _count: {
+              select: {
+                registrations: true,
+              },
+            },
+          },
+        },
+        kit: {
+          include: {
+            sizes: {
+              orderBy: {
+                size: 'asc',
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            registrations: true,
+          },
+        },
+      },
     });
 
-    if (!res.ok) {
+    if (!event) {
       return null;
     }
 
-    return res.json();
+    // Calcular vagas disponíveis por modalidade
+    const modalitiesWithAvailability = event.modalities.map((modality) => ({
+      ...modality,
+      availableSlots: modality.maxSlots
+        ? modality.maxSlots - modality._count.registrations
+        : null, // null = ilimitado
+      isSoldOut: modality.maxSlots
+        ? modality._count.registrations >= modality.maxSlots
+        : false,
+    }));
+
+    // Verificar se evento está com inscrições abertas
+    const now = new Date();
+    const isRegistrationOpen =
+      now >= event.registrationStart && now <= event.registrationEnd;
+
+    // Buscar lote ativo
+    const activeBatch = await getActiveBatch(event.id);
+    const activeBatchInfo = activeBatch
+      ? {
+          id: activeBatch.id,
+          name: activeBatch.name,
+          discountType: activeBatch.discountType,
+          discountValue: activeBatch.discountValue
+            ? Number(activeBatch.discountValue)
+            : null,
+        }
+      : null;
+
+    // Retornar dados formatados
+    return {
+      id: event.id,
+      slug: event.slug,
+      name: event.name,
+      description: event.description,
+      shortDescription: event.shortDescription,
+      eventDate: event.eventDate,
+      registrationStart: event.registrationStart,
+      registrationEnd: event.registrationEnd,
+      location: event.location,
+      bannerUrl: event.bannerUrl,
+      logoUrl: event.logoUrl,
+      coverUrl: event.coverUrl,
+      maxRegistrations: event.maxRegistrations,
+      allowGroupReg: event.allowGroupReg,
+      maxGroupSize: event.maxGroupSize,
+      modalities: modalitiesWithAvailability,
+      totalRegistrations: event._count.registrations,
+      isRegistrationOpen,
+      status: event.status,
+      landingSellingPoints: event.landingSellingPoints,
+      landingAbout: event.landingAbout,
+      landingFaq: event.landingFaq,
+      supportEmail: event.supportEmail,
+      supportWhatsapp: event.supportWhatsapp,
+      activeBatch: activeBatchInfo,
+      kit: event.kit
+        ? {
+            includeShirt: event.kit.includeShirt,
+            shirtRequired: event.kit.shirtRequired,
+            items: event.kit.items,
+            availableSizes: event.kit.sizes
+              .filter((size) => {
+                const available = size.stock - size.reserved - size.sold;
+                return available > 0;
+              })
+              .map((size) => ({
+                size: size.size,
+                available: size.stock - size.reserved - size.sold,
+              })),
+          }
+        : null,
+    };
   } catch (error) {
     console.error('Error fetching event:', error);
     return null;
@@ -182,32 +290,68 @@ export default async function EventPublicPage({ params }: EventPageProps) {
 
           {heroModalities.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {heroModalities.map((modality: any) => (
-                <div
-                  key={modality.id}
-                  className="rounded-3xl bg-white text-[hsl(var(--dark))] shadow-lg border border-[hsl(var(--gray-200))] p-6 space-y-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
+              {heroModalities.map((modality: any) => {
+                // Calcular preço com lote ativo
+                let displayPrice = modality.price;
+                let batchDiscount = 0;
+                if (event.activeBatch && event.activeBatch.discountType && event.activeBatch.discountValue) {
+                  if (event.activeBatch.discountType === 'PERCENTAGE') {
+                    batchDiscount = (modality.price * event.activeBatch.discountValue) / 100;
+                  } else {
+                    batchDiscount = Math.min(event.activeBatch.discountValue, modality.price);
+                  }
+                  displayPrice = modality.price - batchDiscount;
+                }
+
+                return (
+                  <div
+                    key={modality.id}
+                    className="rounded-3xl bg-white text-[hsl(var(--dark))] shadow-lg border border-[hsl(var(--gray-200))] p-6 space-y-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xl font-semibold">{modality.name}</p>
+                        {modality.description && (
+                          <p className="text-sm text-[hsl(var(--gray-600))] mt-1">{modality.description}</p>
+                        )}
+                      </div>
+                      {modality.isSoldOut ? (
+                        <Badge variant="secondary">Esgotado</Badge>
+                      ) : modality.price === 0 ? (
+                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-100">
+                          Gratuita
+                        </Badge>
+                      ) : null}
+                    </div>
+                    {event.activeBatch && batchDiscount > 0 && (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2">
+                        <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">
+                          {event.activeBatch.name}
+                        </p>
+                        <p className="text-xs text-emerald-600 mt-1">
+                          {event.activeBatch.discountType === 'PERCENTAGE'
+                            ? `${event.activeBatch.discountValue}% OFF`
+                            : `${priceFormatter.format(event.activeBatch.discountValue)} OFF`}
+                        </p>
+                      </div>
+                    )}
                     <div>
-                      <p className="text-xl font-semibold">{modality.name}</p>
-                      {modality.description && (
-                        <p className="text-sm text-[hsl(var(--gray-600))] mt-1">{modality.description}</p>
+                      <p className="text-xs uppercase tracking-[0.2em] text-[hsl(var(--gray-500))] mb-1">Valor</p>
+                      {batchDiscount > 0 ? (
+                        <div>
+                          <p className="text-sm text-[hsl(var(--gray-500))] line-through">
+                            {priceFormatter.format(modality.price)}
+                          </p>
+                          <p className="text-2xl font-bold text-emerald-600">
+                            {priceFormatter.format(displayPrice)}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-2xl font-bold">
+                          {modality.price === 0 ? 'Gratuito' : priceFormatter.format(modality.price)}
+                        </p>
                       )}
                     </div>
-                    {modality.isSoldOut ? (
-                      <Badge variant="secondary">Esgotado</Badge>
-                    ) : modality.price === 0 ? (
-                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-100">
-                        Gratuita
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-[hsl(var(--gray-500))] mb-1">Valor</p>
-                    <p className="text-2xl font-bold">
-                      {modality.price === 0 ? 'Gratuito' : priceFormatter.format(modality.price)}
-                    </p>
-                  </div>
                   {modality.maxSlots && (
                     <p className="text-xs text-[hsl(var(--gray-500))]">
                       {modality.availableSlots} de {modality.maxSlots} vagas
@@ -224,8 +368,9 @@ export default async function EventPublicPage({ params }: EventPageProps) {
                     labelOverride={event.isRegistrationOpen ? 'Inscreva-se' : undefined}
                     className="mt-4"
                   />
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
