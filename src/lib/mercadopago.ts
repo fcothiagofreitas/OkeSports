@@ -156,6 +156,32 @@ export function encryptOAuthTokens(data: {
 }
 
 /**
+ * Limpa e valida token encriptado do banco
+ */
+function cleanAndValidateEncryptedToken(token: string | null | undefined, tokenName: string): string {
+  if (!token) {
+    throw new Error(`${tokenName} is missing`);
+  }
+  
+  const cleaned = token.trim().replace(/\s+/g, '');
+  
+  if (!cleaned) {
+    throw new Error(`${tokenName} is empty after cleaning`);
+  }
+  
+  const colonCount = (cleaned.match(/:/g) || []).length;
+  if (colonCount < 2) {
+    throw new Error(
+      `${tokenName} has invalid format: expected 'iv:authTag:encrypted' (3 parts), ` +
+      `but found ${colonCount + 1} part(s). ` +
+      `Please reconnect the Mercado Pago account to generate a new token.`
+    );
+  }
+  
+  return cleaned;
+}
+
+/**
  * Desencripta tokens OAuth do banco
  */
 export function decryptOAuthTokens(data: {
@@ -165,10 +191,59 @@ export function decryptOAuthTokens(data: {
   accessToken: string;
   refreshToken: string;
 } {
-  return {
-    accessToken: decrypt(data.encryptedAccessToken),
-    refreshToken: decrypt(data.encryptedRefreshToken),
-  };
+  try {
+    const cleanedAccessToken = cleanAndValidateEncryptedToken(
+      data.encryptedAccessToken,
+      'Encrypted access token'
+    );
+    
+    const accessTokenParts = cleanedAccessToken.split(':');
+    
+    if (accessTokenParts.length !== 3) {
+      throw new Error(
+        `Invalid encrypted access token format: expected 3 parts, got ${accessTokenParts.length}. ` +
+        `Token may have been encrypted with a different ENCRYPTION_KEY. ` +
+        `Please reconnect the Mercado Pago account.`
+      );
+    }
+    
+    const [ivHex, authTagHex] = accessTokenParts;
+    if (ivHex.length !== 32 || authTagHex.length !== 32) {
+      throw new Error('Invalid token format: IV and authTag must be 32 hex characters each');
+    }
+    
+    const accessToken = decrypt(cleanedAccessToken);
+    
+    let refreshToken = '';
+    if (data.encryptedRefreshToken?.trim()) {
+      const cleanedRefreshToken = cleanAndValidateEncryptedToken(
+        data.encryptedRefreshToken,
+        'Encrypted refresh token'
+      );
+      refreshToken = decrypt(cleanedRefreshToken);
+    }
+    
+    return {
+      accessToken,
+      refreshToken,
+    };
+  } catch (error) {
+    if (error instanceof Error) {
+      if (
+        error.message.includes('Invalid encrypted') ||
+        error.message.includes('Decryption failed') ||
+        error.message.includes('Invalid token format')
+      ) {
+        throw error;
+      }
+      throw new Error(
+        `Failed to decrypt OAuth tokens: ${error.message}. ` +
+        `Token may have been encrypted with a different ENCRYPTION_KEY. ` +
+        `Please reconnect the Mercado Pago account.`
+      );
+    }
+    throw new Error('Failed to decrypt OAuth tokens: Unknown error');
+  }
 }
 
 /**

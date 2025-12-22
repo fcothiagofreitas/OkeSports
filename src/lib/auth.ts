@@ -152,35 +152,89 @@ export function decrypt(encryptedData: string): string {
     // Split encrypted data
     const parts = encryptedData.split(':');
     if (parts.length !== 3) {
-      throw new Error('Invalid encrypted data format');
+      throw new Error(`Invalid encrypted data format: expected 3 parts, got ${parts.length}`);
     }
 
     const [ivHex, authTagHex, encrypted] = parts;
 
+    // Validate hex format
+    const hexRegex = /^[0-9a-fA-F]+$/;
+    if (!hexRegex.test(ivHex) || !hexRegex.test(authTagHex) || !hexRegex.test(encrypted)) {
+      throw new Error('Invalid hex format in encrypted data');
+    }
+
+    // Validate ENCRYPTION_KEY
+    if (!ENCRYPTION_KEY) {
+      throw new Error('ENCRYPTION_KEY is not defined');
+    }
+    
+    if (ENCRYPTION_KEY.length !== 64) {
+      throw new Error(`ENCRYPTION_KEY has invalid length: expected 64 hex chars (32 bytes), got ${ENCRYPTION_KEY.length}`);
+    }
+    
+    if (!hexRegex.test(ENCRYPTION_KEY)) {
+      throw new Error('ENCRYPTION_KEY is not valid hexadecimal');
+    }
+
     // Convert from hex
-    const iv = Buffer.from(ivHex, 'hex');
-    const authTag = Buffer.from(authTagHex, 'hex');
+    let iv: Buffer;
+    let authTag: Buffer;
+    let key: Buffer;
+    
+    try {
+      iv = Buffer.from(ivHex, 'hex');
+      authTag = Buffer.from(authTagHex, 'hex');
+      key = Buffer.from(ENCRYPTION_KEY, 'hex');
+    } catch (bufferError) {
+      throw new Error(`Failed to convert hex to buffer: ${bufferError instanceof Error ? bufferError.message : String(bufferError)}`);
+    }
+
+    // Validate buffer sizes
+    if (iv.length !== 16) {
+      throw new Error(`Invalid IV length: expected 16 bytes, got ${iv.length}`);
+    }
+    if (authTag.length !== 16) {
+      throw new Error(`Invalid auth tag length: expected 16 bytes, got ${authTag.length}`);
+    }
+    if (key.length !== 32) {
+      throw new Error(`Invalid key length: expected 32 bytes, got ${key.length}`);
+    }
 
     // Create decipher
-    const decipher = createDecipheriv(
-      ALGORITHM,
-      Buffer.from(ENCRYPTION_KEY, 'hex'),
-      iv
-    );
+    let decipher;
+    try {
+      decipher = createDecipheriv(ALGORITHM, key, iv);
+    } catch (cipherError) {
+      throw new Error(`Failed to create decipher: ${cipherError instanceof Error ? cipherError.message : String(cipherError)}`);
+    }
 
     // Set auth tag
-    decipher.setAuthTag(authTag);
+    try {
+      decipher.setAuthTag(authTag);
+    } catch (tagError) {
+      throw new Error(`Failed to set auth tag: ${tagError instanceof Error ? tagError.message : String(tagError)}`);
+    }
 
     // Decrypt
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
+    let decrypted: string;
+    try {
+      decrypted = decipher.update(encrypted, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+    } catch (decryptError) {
+      // This is the most common error - wrong key or corrupted data
+      const errorMsg = decryptError instanceof Error ? decryptError.message : String(decryptError);
+      if (errorMsg.includes('Unsupported state') || errorMsg.includes('bad decrypt') || errorMsg.includes('wrong final block length')) {
+        throw new Error(`Decryption failed: Wrong encryption key or corrupted data. The token was encrypted with a different ENCRYPTION_KEY. Original error: ${errorMsg}`);
+      }
+      throw new Error(`Decryption failed: ${errorMsg}`);
+    }
 
     return decrypted;
   } catch (error) {
     if (error instanceof Error) {
-      throw new Error(`Decryption failed: ${error.message}`);
+      throw error; // Re-throw with the detailed message
     }
-    throw new Error('Decryption failed');
+    throw new Error('Decryption failed: Unknown error');
   }
 }
 

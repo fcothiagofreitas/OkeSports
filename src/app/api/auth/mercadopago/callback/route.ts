@@ -3,6 +3,7 @@ import prisma from '@/lib/db';
 import {
   exchangeCodeForTokens,
   encryptOAuthTokens,
+  decryptOAuthTokens,
   calculateTokenExpiration,
   getMercadoPagoUserInfo,
 } from '@/lib/mercadopago';
@@ -58,16 +59,37 @@ export async function GET(request: NextRequest) {
     const mpUserInfo = await getMercadoPagoUserInfo(tokenResponse.access_token);
 
     // 4. Encriptar tokens para armazenar no banco
+    console.log('🔐 Encriptando tokens OAuth...');
+    console.log('📋 Access Token (antes de encriptar):', tokenResponse.access_token.substring(0, 20) + '...');
+    
     const { encryptedAccessToken, encryptedRefreshToken } = encryptOAuthTokens({
       accessToken: tokenResponse.access_token,
       refreshToken: tokenResponse.refresh_token,
     });
 
+    // Verificar formato do token encriptado
+    const tokenParts = encryptedAccessToken.split(':');
+    console.log('✅ Token encriptado:', {
+      parts: tokenParts.length,
+      format: tokenParts.length === 3 ? 'CORRETO (iv:authTag:encrypted)' : 'INCORRETO',
+      preview: encryptedAccessToken.substring(0, 50) + '...',
+    });
+
+    if (tokenParts.length !== 3) {
+      console.error('❌ ERRO: Token encriptado não está no formato correto!');
+      console.error('❌ Esperado: iv:authTag:encrypted (3 partes)');
+      console.error('❌ Recebido:', tokenParts.length, 'partes');
+      throw new Error('Erro ao encriptar token: formato inválido');
+    }
+
     // 5. Calcular data de expiração
     const expiresAt = calculateTokenExpiration(tokenResponse.expires_in);
 
     // 6. Atualizar usuário no banco
-    await prisma.user.update({
+    console.log('💾 Atualizando usuário no banco de dados...');
+    console.log('👤 User ID:', userId);
+    
+    const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
         mpConnected: true,
@@ -78,7 +100,61 @@ export async function GET(request: NextRequest) {
         mpTokenExpiresAt: expiresAt,
         updatedAt: new Date(),
       },
+      select: {
+        id: true,
+        email: true,
+        mpConnected: true,
+        mpUserId: true,
+        mpAccessToken: true,
+        mpPublicKey: true,
+        mpTokenExpiresAt: true,
+        updatedAt: true,
+      },
     });
+
+    // Verificar se foi atualizado corretamente
+    const savedTokenParts = updatedUser.mpAccessToken?.split(':') || [];
+    console.log('✅ Usuário atualizado:', {
+      id: updatedUser.id,
+      email: updatedUser.email,
+      mpConnected: updatedUser.mpConnected,
+      mpUserId: updatedUser.mpUserId,
+      tokenFormat: savedTokenParts.length === 3 ? 'CORRETO' : 'INCORRETO',
+      tokenParts: savedTokenParts.length,
+      tokenPreview: updatedUser.mpAccessToken?.substring(0, 50) + '...',
+      updatedAt: updatedUser.updatedAt,
+    });
+
+    if (savedTokenParts.length !== 3) {
+      console.error('❌ ERRO CRÍTICO: Token salvo no banco não está no formato correto!');
+      console.error('❌ Isso causará erro ao descriptografar posteriormente.');
+    }
+
+    // 6.5. Testar descriptografia imediatamente para garantir que funciona
+    console.log('🧪 Testando descriptografia do token salvo...');
+    try {
+      const decrypted = decryptOAuthTokens({
+        encryptedAccessToken: updatedUser.mpAccessToken!,
+        encryptedRefreshToken: encryptedRefreshToken,
+      });
+      
+      console.log('✅ Teste de descriptografia: SUCESSO');
+      console.log('📋 Token descriptografado (primeiros 20 chars):', decrypted.accessToken.substring(0, 20) + '...');
+      console.log('🔍 Token original (primeiros 20 chars):', tokenResponse.access_token.substring(0, 20) + '...');
+      
+      if (decrypted.accessToken !== tokenResponse.access_token) {
+        console.error('❌ ERRO: Token descriptografado não corresponde ao original!');
+      } else {
+        console.log('✅ Tokens correspondem perfeitamente!');
+      }
+    } catch (decryptError) {
+      console.error('❌ ERRO CRÍTICO ao testar descriptografia:', decryptError);
+      console.error('❌ Isso significa que o token NÃO poderá ser usado posteriormente!');
+      console.error('💡 Possíveis causas:');
+      console.error('   1. ENCRYPTION_KEY mudou após encriptar');
+      console.error('   2. Formato do token está incorreto');
+      console.error('   3. Token foi corrompido durante o salvamento');
+    }
 
     // 7. Redirecionar para dashboard com sucesso
     return NextResponse.redirect(

@@ -86,7 +86,8 @@ async function getRegistrations(
       basePrice: Number(reg.basePrice),
       discount: Number(reg.discount),
       subtotal: Number(reg.subtotal),
-      platformFee: Number(reg.platformFee),
+      platformFee: Number(reg.platformFee), // Mantido para histórico, mas não exibir ao org
+      mercadoPagoFee: reg.mercadoPagoFee ? Number(reg.mercadoPagoFee) : null,
       total: Number(reg.total),
       paymentStatus: reg.paymentStatus,
       paymentMethod: reg.paymentMethod,

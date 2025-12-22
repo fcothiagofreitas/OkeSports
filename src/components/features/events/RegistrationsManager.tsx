@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { apiGet, ApiError } from '@/lib/api';
+import { apiGet, apiPost, ApiError } from '@/lib/api';
 import { Loader2, Download, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
@@ -26,7 +26,8 @@ interface Registration {
   basePrice: number;
   discount: number;
   subtotal: number;
-  platformFee: number;
+  platformFee: number; // Taxa Okê (paga pelo competidor - não exibir ao org)
+  mercadoPagoFee: number | null; // Taxa do gateway (paga pelo organizador)
   total: number;
   paymentStatus: 'PENDING' | 'PROCESSING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'REFUNDED';
   paymentMethod: string | null;
@@ -102,7 +103,7 @@ export function RegistrationsManager({ eventId, accessToken }: RegistrationsMana
     try {
       setIsLoading(true);
       setError(null);
-      const response = await apiGet<RegistrationsData>(`/api/events/${eventId}/registrations`, accessToken);
+      const response = await apiGet<RegistrationsData>(`/api/events/${eventId}/registrations`);
       setData(response);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -134,6 +135,72 @@ export function RegistrationsManager({ eventId, accessToken }: RegistrationsMana
 
   const formatCPF = (cpf: string) => {
     return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  };
+
+  const exportToCSV = (registrations: Registration[], eventName: string) => {
+    // Cabeçalhos
+    const headers = [
+      'Número',
+      'Nome',
+      'Email',
+      'CPF',
+      'Telefone',
+      'Modalidade',
+      'Preço Base',
+      'Desconto',
+      'Subtotal',
+      'Total Pago',
+      'Taxa Mercado Pago',
+      'Total Líquido (Org recebe)',
+      'Status Inscrição',
+      'Status Pagamento',
+      'Método Pagamento',
+      'Tamanho Camiseta',
+      'Cupom',
+      'Data Inscrição',
+      'Data Confirmação',
+    ];
+
+    // Linhas de dados
+    const rows = registrations.map((reg) => [
+      reg.registrationNumber.toString().padStart(4, '0'),
+      reg.participant.fullName,
+      reg.participant.email,
+      reg.participant.cpf,
+      reg.participant.phone,
+      reg.modality.name,
+      formatCurrency(reg.basePrice),
+      formatCurrency(reg.discount),
+      formatCurrency(reg.subtotal),
+      formatCurrency(reg.total),
+      formatCurrency(reg.mercadoPagoFee || 0),
+      formatCurrency(reg.total - (reg.mercadoPagoFee || 0)), // Líquido (o que o org recebe)
+      registrationStatusLabels[reg.status].label,
+      paymentStatusLabels[reg.paymentStatus].label,
+      reg.paymentMethod ? (paymentMethodLabels[reg.paymentMethod] || reg.paymentMethod) : '-',
+      reg.shirtSize || '-',
+      reg.coupon ? `${reg.coupon.code} (${reg.coupon.discountType === 'PERCENTAGE' ? `${reg.coupon.discountValue}%` : formatCurrency(reg.coupon.discountValue)})` : '-',
+      formatDate(reg.createdAt),
+      reg.confirmedAt ? formatDate(reg.confirmedAt) : '-',
+    ]);
+
+    // Criar CSV
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    // BOM para Excel
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', `inscricoes-${eventName.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const filteredRegistrations = data?.registrations.filter((reg) => {
@@ -198,9 +265,20 @@ export function RegistrationsManager({ eventId, accessToken }: RegistrationsMana
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-[hsl(var(--gray-600))] mb-1">Receita Total</p>
+            <p className="text-sm text-[hsl(var(--gray-600))] mb-1">Receita Bruta</p>
             <p className="text-2xl font-bold text-[hsl(var(--accent-pink))]">
               {formatCurrency(data.summary.totalRevenue)}
+            </p>
+            <p className="text-xs text-[hsl(var(--gray-500))] mt-1">
+              Líquida:{' '}
+              {formatCurrency(
+                data.registrations
+                  .filter((r) => r.paymentStatus === 'APPROVED')
+                  .reduce((sum, r) => {
+                    const mpFee = r.mercadoPagoFee ? Number(r.mercadoPagoFee) : 0;
+                    return sum + Number(r.subtotal) - mpFee;
+                  }, 0)
+              )}
             </p>
           </CardContent>
         </Card>
@@ -268,7 +346,7 @@ export function RegistrationsManager({ eventId, accessToken }: RegistrationsMana
                         Modalidade
                       </th>
                       <th className="text-left py-3 px-4 text-sm font-semibold text-[hsl(var(--gray-700))]">
-                        Valor
+                        Valor (Líquido)
                       </th>
                       <th className="text-left py-3 px-4 text-sm font-semibold text-[hsl(var(--gray-700))]">
                         Status
@@ -300,14 +378,56 @@ export function RegistrationsManager({ eventId, accessToken }: RegistrationsMana
                         <td className="py-3 px-4 text-sm">{reg.modality.name}</td>
                         <td className="py-3 px-4">
                           <div>
-                            <p className="font-medium text-[hsl(var(--dark))]">{formatCurrency(reg.total)}</p>
+                            <p className="font-medium text-[hsl(var(--dark))]">
+                              {reg.mercadoPagoFee
+                                ? formatCurrency(reg.subtotal - reg.mercadoPagoFee)
+                                : formatCurrency(reg.subtotal)}
+                            </p>
+                            <p className="text-xs text-[hsl(var(--gray-500))]">
+                              Inscrição: {formatCurrency(reg.subtotal)}
+                            </p>
+                            {reg.mercadoPagoFee ? (
+                              <p className="text-xs text-[hsl(var(--gray-500))]">
+                                Taxa MP: {formatCurrency(reg.mercadoPagoFee)}
+                              </p>
+                            ) : reg.paymentStatus === 'APPROVED' ? (
+                              <div className="mt-1">
+                                <p className="text-xs text-amber-600 mb-1">
+                                  Taxa MP não calculada
+                                </p>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-xs h-6"
+                                  onClick={async () => {
+                                    try {
+                                      await apiPost(`/api/registrations/${reg.id}/recalculate-fee`);
+                                      await fetchRegistrations();
+                                    } catch (error) {
+                                      console.error('Erro:', error);
+                                      alert(
+                                        error instanceof ApiError
+                                          ? error.message
+                                          : 'Erro ao recalcular taxa'
+                                      );
+                                    }
+                                  }}
+                                >
+                                  Recalcular
+                                </Button>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-[hsl(var(--gray-500))]">
+                                Aguardando pagamento
+                              </p>
+                            )}
                             {reg.discount > 0 && (
-                              <p className="text-xs text-[hsl(var(--gray-500))] line-through">
-                                {formatCurrency(reg.basePrice)}
+                              <p className="text-xs text-[hsl(var(--gray-500))] line-through mt-1">
+                                Original: {formatCurrency(reg.basePrice)}
                               </p>
                             )}
                             {reg.coupon && (
-                              <p className="text-xs text-emerald-600">Cupom: {reg.coupon.code}</p>
+                              <p className="text-xs text-emerald-600 mt-1">Cupom: {reg.coupon.code}</p>
                             )}
                           </div>
                         </td>
@@ -342,7 +462,12 @@ export function RegistrationsManager({ eventId, accessToken }: RegistrationsMana
           {/* Exportar */}
           {filteredRegistrations.length > 0 && (
             <div className="flex justify-end pt-4 border-t border-[hsl(var(--gray-200))]">
-              <Button variant="outline" onClick={() => alert('Funcionalidade de exportação em breve')}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  exportToCSV(filteredRegistrations, data.event.name);
+                }}
+              >
                 <Download className="h-4 w-4 mr-2" />
                 Exportar CSV
               </Button>

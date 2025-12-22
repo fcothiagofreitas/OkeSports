@@ -360,11 +360,12 @@ model Registration {
   coupon        Coupon?     @relation(fields: [couponId], references: [id])
 
   // Valores
-  basePrice   Decimal @db.Decimal(10, 2) // Preço original
-  discount    Decimal @db.Decimal(10, 2) @default(0)
-  subtotal    Decimal @db.Decimal(10, 2) // basePrice - discount
-  platformFee Decimal @db.Decimal(10, 2) // 10% da subtotal
-  total       Decimal @db.Decimal(10, 2) // subtotal + platformFee
+  basePrice     Decimal @db.Decimal(10, 2) // Preço original
+  discount      Decimal @db.Decimal(10, 2) @default(0)
+  subtotal      Decimal @db.Decimal(10, 2) // basePrice - discount
+  platformFee   Decimal @db.Decimal(10, 2) // 10% da subtotal (taxa Okê - paga pelo competidor)
+  mercadoPagoFee Decimal? @db.Decimal(10, 2) // Taxa do gateway (paga pelo organizador)
+  total         Decimal @db.Decimal(10, 2) // subtotal + platformFee
 
   // Pagamento
   paymentId     String?        @unique // ID do Mercado Pago

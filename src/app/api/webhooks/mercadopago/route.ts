@@ -166,6 +166,87 @@ export async function POST(request: NextRequest) {
     const paymentStatus = payment.status;
     const paymentMethod = payment.payment_type_id;
 
+    // Capturar taxa do Mercado Pago
+    // IMPORTANTE: Com marketplace_fee, o net_received_amount é o valor líquido que o organizador recebe
+    // (já descontado marketplace_fee e taxa do MP)
+    let mercadoPagoFee: number | null = null;
+    
+    const transactionDetails = payment.transaction_details;
+    const transactionAmount = payment.transaction_amount; // Valor total pago pelo competidor
+    const marketplaceFee = payment.marketplace_fee || Number(registration.platformFee) || 0; // Taxa Okê
+    
+    // Log completo da resposta do MP para debug
+    console.log('📦 Resposta completa do Mercado Pago:', {
+      paymentId: payment.id,
+      transactionAmount,
+      marketplaceFee: payment.marketplace_fee,
+      transactionDetails: transactionDetails ? JSON.stringify(transactionDetails, null, 2) : 'null',
+      hasTransactionDetails: !!transactionDetails,
+    });
+    
+    if (transactionDetails) {
+      const netReceived = transactionDetails.net_received_amount; // Valor líquido que o organizador recebe
+      
+      // Método 1: Priorizar fee_details se disponível (mais preciso - já vem separado)
+      if (transactionDetails.fee_details && Array.isArray(transactionDetails.fee_details)) {
+        const totalFees = transactionDetails.fee_details.reduce(
+          (sum: number, fee: any) => sum + (Number(fee.amount) || 0),
+          0
+        );
+        if (totalFees > 0) {
+          mercadoPagoFee = totalFees;
+          console.log('✅ Taxa calculada via fee_details:', totalFees);
+        }
+      }
+      
+      // Método 2: Calcular usando net_received_amount
+      if (mercadoPagoFee === null && netReceived !== undefined && transactionAmount) {
+        // Taxa MP = valor total - valor líquido recebido - marketplace_fee
+        mercadoPagoFee = transactionAmount - netReceived - marketplaceFee;
+        
+        console.log('🔢 Cálculo taxa:', {
+          transactionAmount,
+          netReceived,
+          marketplaceFee,
+          calculado: mercadoPagoFee,
+        });
+        
+        // Garantir que não seja negativo ou zero
+        if (mercadoPagoFee <= 0) {
+          console.warn('⚠️ Taxa calculada é negativa ou zero, definindo como null');
+          mercadoPagoFee = null;
+        } else {
+          console.log('✅ Taxa calculada via net_received:', mercadoPagoFee);
+        }
+      }
+      
+      // Método 3: Se ainda não tem, tentar usar total_paid_amount
+      if (mercadoPagoFee === null && transactionDetails.total_paid_amount) {
+        const totalPaid = transactionDetails.total_paid_amount;
+        const netReceived = transactionDetails.net_received_amount;
+        
+        if (netReceived !== undefined) {
+          mercadoPagoFee = totalPaid - netReceived - marketplaceFee;
+          if (mercadoPagoFee <= 0) {
+            mercadoPagoFee = null;
+          } else {
+            console.log('✅ Taxa calculada via total_paid_amount:', mercadoPagoFee);
+          }
+        }
+      }
+    } else {
+      console.warn('⚠️ transaction_details não disponível na resposta do MP');
+    }
+    
+    // Log final
+    console.log('🔍 Resultado final cálculo taxa:', {
+      registrationId: registration.id,
+      paymentId: payment.id,
+      mercadoPagoFee,
+      transactionAmount,
+      marketplaceFee,
+    });
+
     // Processar baseado no status
     if (paymentStatus === 'approved') {
       // 1. Atualizar inscrição
@@ -175,6 +256,7 @@ export async function POST(request: NextRequest) {
           paymentStatus: 'APPROVED',
           status: 'CONFIRMED',
           paymentMethod,
+          mercadoPagoFee: mercadoPagoFee ? mercadoPagoFee : null,
           confirmedAt: new Date(),
         },
       });

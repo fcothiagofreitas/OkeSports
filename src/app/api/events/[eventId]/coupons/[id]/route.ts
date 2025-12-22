@@ -200,16 +200,34 @@ async function deleteCoupon(
       );
     }
 
-    // Verificar se cupom existe
+    // Verificar se cupom existe e quantas vezes foi usado
     const coupon = await prisma.coupon.findFirst({
       where: {
         id,
         eventId,
       },
+      include: {
+        _count: {
+          select: {
+            registrations: true,
+          },
+        },
+      },
     });
 
     if (!coupon) {
       return NextResponse.json({ error: 'Cupom não encontrado' }, { status: 404 });
+    }
+
+    // Verificar se cupom já foi usado em inscrições
+    if (coupon._count.registrations > 0) {
+      return NextResponse.json(
+        {
+          error: 'Não é possível deletar um cupom que já foi usado em inscrições',
+          usedCount: coupon._count.registrations,
+        },
+        { status: 400 }
+      );
     }
 
     // Deletar cupom

@@ -166,24 +166,25 @@ export async function POST(request: NextRequest) {
       couponId = coupon?.id;
     }
 
-    // 10.5. Validar e reservar estoque do kit (se tamanho informado)
-    if (validatedData.shirtSize) {
-      const kit = await prisma.kit.findUnique({
-        where: { eventId: validatedData.eventId },
-        include: {
-          sizes: true,
-        },
-      });
+    // 10.5. Validar e reservar estoque do kit
+    const kit = await prisma.kit.findUnique({
+      where: { eventId: validatedData.eventId },
+      include: {
+        sizes: true,
+      },
+    });
 
-      if (kit) {
-        // Verificar se tamanho é obrigatório
-        if (kit.shirtRequired && !validatedData.shirtSize) {
-          return NextResponse.json(
-            { error: 'Tamanho da camiseta é obrigatório para este evento' },
-            { status: 400 }
-          );
-        }
+    if (kit) {
+      // Verificar se tamanho é obrigatório (deve ser feito ANTES de verificar se foi fornecido)
+      if (kit.shirtRequired && !validatedData.shirtSize) {
+        return NextResponse.json(
+          { error: 'Tamanho da camiseta é obrigatório para este evento' },
+          { status: 400 }
+        );
+      }
 
+      // Se tamanho foi informado, validar e reservar estoque
+      if (validatedData.shirtSize) {
         // Buscar estoque do tamanho
         const sizeStock = kit.sizes.find((s) => s.size === validatedData.shirtSize);
 
