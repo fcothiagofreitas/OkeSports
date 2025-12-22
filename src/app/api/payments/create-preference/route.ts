@@ -91,10 +91,17 @@ export async function POST(request: NextRequest) {
         supportsSplitPayments = true;
         
         // Detectar se é token de teste
-        const clientId = process.env.MP_CLIENT_ID || '';
+        // Tokens de teste geralmente começam com 'TEST-' ou contêm 'test'/'sandbox'
+        // Tokens de produção começam com 'APP_USR-' e NÃO contêm indicadores de teste
+        // IMPORTANTE: Se estamos usando token OAuth do organizador, assumir produção
+        // a menos que o token explicitamente indique teste
         isTestMode = 
           accessToken.startsWith('TEST-') ||
-          (/^\d+$/.test(clientId) && accessToken.startsWith('APP_USR-'));
+          accessToken.toLowerCase().includes('test') ||
+          accessToken.toLowerCase().includes('sandbox');
+        
+        // Se não detectou teste explicitamente, assumir produção
+        // (variáveis de teste no .env são apenas para fallback, não afetam token OAuth)
       } catch (error) {
         console.error('❌ Erro ao descriptografar token OAuth:', error instanceof Error ? error.message : String(error));
         // Continuar para tentar fallback
