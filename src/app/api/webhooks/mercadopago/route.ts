@@ -25,8 +25,15 @@ function verifySignature({
   requestUrl: string;
 }): boolean {
   const secret = process.env.MP_WEBHOOK_SECRET;
+  
+  // Em desenvolvimento, permitir webhook sem assinatura se MP_WEBHOOK_SECRET não estiver configurado
+  if (process.env.NODE_ENV === 'development' && !secret) {
+    console.warn('⚠️  MP_WEBHOOK_SECRET não configurado - permitindo webhook sem validação (apenas em desenvolvimento)');
+    return true;
+  }
+  
   if (!secret || !signatureHeader) {
-    console.warn('Webhook MP sem assinatura ou segredo configurado');
+    console.warn('❌ Webhook MP sem assinatura ou segredo configurado');
     return false;
   }
 
@@ -34,6 +41,8 @@ function verifySignature({
   const v1Match = signatureHeader.match(/v1=([^,]+)/);
 
   if (!tsMatch || !v1Match) {
+    console.warn('❌ Formato de assinatura inválido');
+    console.warn('   Signature header:', signatureHeader);
     return false;
   }
 
@@ -46,10 +55,24 @@ function verifySignature({
   const computedBuffer = Buffer.from(computed);
 
   if (signatureBuffer.length !== computedBuffer.length) {
+    console.warn('❌ Tamanho de assinatura inválido');
+    console.warn('   Signature length:', signatureBuffer.length);
+    console.warn('   Computed length:', computedBuffer.length);
     return false;
   }
 
-  return crypto.timingSafeEqual(signatureBuffer, computedBuffer);
+  const isValid = crypto.timingSafeEqual(signatureBuffer, computedBuffer);
+  if (!isValid) {
+    console.warn('❌ Assinatura inválida');
+    console.warn('   URL usada:', requestUrl);
+    console.warn('   Payload:', `${timestamp}.${requestUrl.substring(0, 50)}...${rawBody.substring(0, 50)}...`);
+    console.warn('   Possíveis causas:');
+    console.warn('     - MP_WEBHOOK_SECRET incorreto');
+    console.warn('     - URL diferente da configurada no Mercado Pago');
+    console.warn('     - Query parameters na URL podem afetar a assinatura');
+  }
+  
+  return isValid;
 }
 
 export async function POST(request: NextRequest) {
@@ -64,13 +87,61 @@ export async function POST(request: NextRequest) {
     }
 
     const signatureHeader = request.headers.get('x-signature');
-    const expectedUrl =
+    
+    // Obter a URL real da requisição (com query params se houver)
+    const requestUrl = new URL(request.url);
+    const actualUrl = `${requestUrl.origin}${requestUrl.pathname}${requestUrl.search}`;
+    
+    // URL esperada (pode ser configurada ou usar a padrão)
+    const expectedUrlBase =
       process.env.MP_WEBHOOK_URL ||
       `${process.env.NEXT_PUBLIC_APP_URL || 'https://dev.okesports.com.br'}/api/webhooks/mercadopago`;
+    
+    // Tentar com a URL completa (com query params) primeiro, depois sem
+    const urlsToTry = [
+      actualUrl, // URL completa com query params
+      `${requestUrl.origin}${requestUrl.pathname}`, // URL sem query params
+      expectedUrlBase, // URL configurada
+    ];
 
-    if (!verifySignature({ rawBody, signatureHeader, requestUrl: expectedUrl })) {
-      console.warn('Assinatura do webhook Mercado Pago inválida');
-      return NextResponse.json({ error: 'Assinatura inválida' }, { status: 401 });
+    // Log para debug
+    console.log('🔍 Verificando assinatura do webhook:', {
+      hasSignature: !!signatureHeader,
+      hasSecret: !!process.env.MP_WEBHOOK_SECRET,
+      actualUrl,
+      expectedUrlBase,
+      urlsToTry,
+    });
+
+    let isValid = false;
+    for (const urlToTry of urlsToTry) {
+      isValid = verifySignature({ rawBody, signatureHeader, requestUrl: urlToTry });
+      if (isValid) {
+        console.log('✅ Assinatura válida usando URL:', urlToTry);
+        break;
+      }
+    }
+
+    if (!isValid) {
+      console.warn('❌ Assinatura do webhook Mercado Pago inválida após tentar todas as URLs');
+      console.warn('   URLs testadas:', urlsToTry);
+      console.warn('   Signature header:', signatureHeader?.substring(0, 50) + '...');
+      console.warn('   MP_WEBHOOK_SECRET configurado:', !!process.env.MP_WEBHOOK_SECRET);
+      console.warn('   NODE_ENV:', process.env.NODE_ENV);
+      
+      // Em desenvolvimento, permitir sem validação se não tiver secret configurado
+      if (process.env.NODE_ENV === 'development' && !process.env.MP_WEBHOOK_SECRET) {
+        console.warn('⚠️  Modo desenvolvimento: permitindo webhook sem validação (MP_WEBHOOK_SECRET não configurado)');
+        // Continuar processamento sem validação
+      } else if (process.env.NODE_ENV === 'development') {
+        // Em desenvolvimento com secret, mas ainda permitir para debug
+        console.warn('⚠️  Modo desenvolvimento: permitindo webhook mesmo com assinatura inválida (para debug)');
+        console.warn('   ⚠️  ATENÇÃO: Em produção, isso deve ser rejeitado!');
+        // Continuar processamento para debug
+      } else {
+        // Em produção, rejeitar
+        return NextResponse.json({ error: 'Assinatura inválida' }, { status: 401 });
+      }
     }
 
     // Idempotência: usar x-request-id para evitar processamento duplicado
@@ -90,10 +161,11 @@ export async function POST(request: NextRequest) {
     const webhook = mercadoPagoWebhookSchema.parse(body);
 
     // Log para debug
-    console.log('Webhook MP recebido:', {
+    console.log('📥 Webhook MP recebido:', {
       type: webhook.type,
       action: webhook.action,
       paymentId: webhook.data.id,
+      timestamp: new Date().toISOString(),
     });
 
     // Processar apenas notificações de pagamento
@@ -101,8 +173,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Tipo ignorado' }, { status: 200 });
     }
 
-    // Buscar inscrição pelo paymentId
-    const registration = await prisma.registration.findFirst({
+    // Buscar inscrição: primeiro por paymentId
+    let registration = await prisma.registration.findFirst({
       where: {
         paymentId: webhook.data.id,
       },
@@ -137,12 +209,84 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Se não encontrou pelo paymentId, buscar payment no MP para obter external_reference
+    // e então buscar a inscrição pelo registrationId (external_reference)
     if (!registration) {
-      console.warn('Inscrição não encontrada para payment:', webhook.data.id);
-      return NextResponse.json({ message: 'Inscrição não encontrada' }, { status: 404 });
+      try {
+        // Tentar buscar payment usando token da aplicação para obter external_reference
+        const appToken = process.env.MP_TEST_ACCESS_TOKEN || process.env.MP_TEST_SELLER_TOKEN;
+        if (appToken) {
+          const paymentResponse = await fetch(
+            `https://api.mercadopago.com/v1/payments/${webhook.data.id}`,
+            {
+              headers: { Authorization: `Bearer ${appToken}` },
+            }
+          );
+
+          if (paymentResponse.ok) {
+            const paymentData = await paymentResponse.json();
+            const registrationId = paymentData.external_reference;
+
+            if (registrationId) {
+              // Buscar inscrição pelo external_reference (registrationId)
+              registration = await prisma.registration.findUnique({
+                where: {
+                  id: registrationId,
+                },
+                include: {
+                  event: {
+                    select: {
+                      id: true,
+                      organizerId: true,
+                      organizer: {
+                        select: {
+                          mpAccessToken: true,
+                        },
+                      },
+                    },
+                  },
+                  modality: {
+                    select: {
+                      id: true,
+                    },
+                  },
+                  coupon: {
+                    select: {
+                      id: true,
+                    },
+                  },
+                  participant: {
+                    select: {
+                      fullName: true,
+                      email: true,
+                    },
+                  },
+                },
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Erro ao buscar payment para external_reference:', error);
+      }
     }
 
-    // Buscar detalhes do pagamento no Mercado Pago
+    if (!registration) {
+      console.error('❌ Inscrição não encontrada para payment:', webhook.data.id);
+      console.error('   Verifique se o external_reference está sendo enviado corretamente na preferência');
+      return NextResponse.json({ message: 'Inscrição não encontrada' }, { status: 404 });
+    }
+    
+    // Se encontrou pelo external_reference mas não tem paymentId salvo, salvar agora
+    if (!registration.paymentId) {
+      await prisma.registration.update({
+        where: { id: registration.id },
+        data: { paymentId: webhook.data.id.toString() },
+      });
+      console.log('✅ paymentId salvo na inscrição:', registration.id);
+    }
+
+    // Buscar detalhes do pagamento no Mercado Pago usando token do organizador
     const { decryptOAuthTokens } = await import('@/lib/mercadopago');
     // TODO: armazenar e usar também o refresh_token para renovar access tokens se necessário
     const { accessToken: mpAccessToken } = decryptOAuthTokens({
@@ -165,6 +309,21 @@ export async function POST(request: NextRequest) {
     const payment = await paymentDetails.json();
     const paymentStatus = payment.status;
     const paymentMethod = payment.payment_type_id;
+    const statusDetail = payment.status_detail;
+
+    // Log detalhado do status
+    console.log('📊 Status do pagamento:', {
+      paymentId: payment.id,
+      status: paymentStatus,
+      statusDetail: statusDetail,
+      externalReference: payment.external_reference,
+    });
+    console.log('📊 Status do pagamento:', {
+      paymentId: payment.id,
+      status: paymentStatus,
+      statusDetail: statusDetail,
+      externalReference: payment.external_reference,
+    });
 
     // Capturar taxa do Mercado Pago
     // IMPORTANTE: Com marketplace_fee, o net_received_amount é o valor líquido que o organizador recebe
@@ -249,10 +408,11 @@ export async function POST(request: NextRequest) {
 
     // Processar baseado no status
     if (paymentStatus === 'approved') {
-      // 1. Atualizar inscrição
+      // 1. Atualizar inscrição (garantir que paymentId está salvo)
       await prisma.registration.update({
         where: { id: registration.id },
         data: {
+          paymentId: webhook.data.id.toString(),
           paymentStatus: 'APPROVED',
           status: 'CONFIRMED',
           paymentMethod,
@@ -369,12 +529,54 @@ export async function POST(request: NextRequest) {
     }
 
     // Status intermediário (pending, in_process, etc)
-    return NextResponse.json({ message: 'Status recebido' });
+    // Exemplo: quando precisa de autorização adicional (fraud-remedies)
+    // O Mercado Pago enviará outro webhook quando o status mudar para 'approved'
+    
+    // Salvar paymentId mesmo em status intermediário para facilitar rastreamento
+    if (!registration.paymentId || registration.paymentId !== webhook.data.id.toString()) {
+      await prisma.registration.update({
+        where: { id: registration.id },
+        data: { 
+          paymentId: webhook.data.id.toString(),
+          // Manter PENDING para status intermediários (o enum não tem IN_PROCESS, usa PROCESSING)
+          paymentStatus: paymentStatus === 'in_process' ? 'PROCESSING' : 'PENDING',
+        },
+      });
+      console.log('💾 paymentId e status intermediário salvos:', {
+        registrationId: registration.id,
+        paymentId: webhook.data.id,
+        status: paymentStatus,
+        statusDetail: statusDetail,
+      });
+    }
+
+    console.log('⏳ Pagamento em processamento:', {
+      paymentId: webhook.data.id,
+      status: paymentStatus,
+      statusDetail: statusDetail,
+      message: 'Aguardando aprovação. O Mercado Pago enviará outro webhook quando o status mudar.',
+    });
+
+    // Registrar webhook como processado mesmo em status intermediário
+    if (requestId) {
+      await prisma.processedWebhook.create({
+        data: {
+          requestId,
+        },
+      });
+    }
+
+    return NextResponse.json({ 
+      message: 'Status intermediário recebido',
+      status: paymentStatus,
+      statusDetail: statusDetail,
+      note: 'O Mercado Pago enviará outro webhook quando o pagamento for aprovado ou rejeitado',
+    });
   } catch (error) {
     if (error instanceof ZodError) {
-      console.error('Webhook validation error:', error.errors);
+      console.error('Webhook validation error:', error.issues);
       return NextResponse.json(
-        { error: 'Payload inválido', details: error.errors },
+        { error: 'Payload inválido', details: error.issues },
         { status: 400 }
       );
     }

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { apiGet, apiPost, ApiError } from '@/lib/api';
-import { Loader2, Download, Search } from 'lucide-react';
+import { Loader2, Download, Search, RefreshCw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
 interface Registration {
@@ -94,9 +94,33 @@ export function RegistrationsManager({ eventId, accessToken }: RegistrationsMana
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'PENDING' | 'CONFIRMED' | 'CANCELLED'>('all');
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'PENDING' | 'APPROVED' | 'REJECTED'>('all');
+  const [isCheckingPayments, setIsCheckingPayments] = useState(false);
+
+  // Verificação automática silenciosa (sem mostrar loading)
+  const checkPendingPaymentsAuto = async () => {
+    try {
+      // Verificar apenas pendentes das últimas 24h para não sobrecarregar
+      const response = await apiGet<{
+        message: string;
+        checked: number;
+        updated: number;
+      }>(`/api/payments/check-pending?eventId=${eventId}&hoursAgo=24`);
+
+      // Se atualizou algum pagamento, recarregar a lista
+      if (response.updated > 0) {
+        await fetchRegistrations();
+      }
+    } catch (err) {
+      // Silenciar erros na verificação automática
+      console.debug('Verificação automática de pagamentos falhou:', err);
+    }
+  };
 
   useEffect(() => {
     fetchRegistrations();
+    // Verificar automaticamente pagamentos pendentes das últimas 24h ao carregar
+    checkPendingPaymentsAuto();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId, accessToken]);
 
   const fetchRegistrations = async () => {
@@ -113,6 +137,49 @@ export function RegistrationsManager({ eventId, accessToken }: RegistrationsMana
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const checkPendingPayments = async () => {
+    try {
+      setIsCheckingPayments(true);
+      setError(null);
+      
+      const response = await apiGet<{
+        message: string;
+        checked: number;
+        updated: number;
+        results: Array<{
+          registrationId: string;
+          registrationNumber: number;
+          status: string;
+          message: string;
+          paymentStatus?: string;
+        }>;
+      }>(`/api/payments/check-pending?eventId=${eventId}`);
+
+      // Recarregar inscrições após verificação
+      await fetchRegistrations();
+
+      // Mostrar resultado
+      if (response.updated > 0) {
+        alert(`✅ ${response.updated} pagamento(s) atualizado(s) com sucesso!`);
+      } else if (response.checked > 0) {
+        alert(`ℹ️ ${response.checked} pagamento(s) verificado(s). Nenhum atualizado.`);
+      } else {
+        alert('ℹ️ Nenhum pagamento pendente encontrado.');
+      }
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+        alert(`❌ Erro ao verificar pagamentos: ${err.message}`);
+      } else {
+        const errorMessage = 'Erro ao verificar pagamentos pendentes';
+        setError(errorMessage);
+        alert(`❌ ${errorMessage}`);
+      }
+    } finally {
+      setIsCheckingPayments(false);
     }
   };
 
@@ -459,9 +526,26 @@ export function RegistrationsManager({ eventId, accessToken }: RegistrationsMana
             )}
           </div>
 
-          {/* Exportar */}
-          {filteredRegistrations.length > 0 && (
-            <div className="flex justify-end pt-4 border-t border-[hsl(var(--gray-200))]">
+          {/* Ações */}
+          <div className="flex justify-between items-center pt-4 border-t border-[hsl(var(--gray-200))]">
+            {/* Verificar pagamentos pendentes */}
+            {data.summary.pending > 0 && (
+              <Button
+                variant="outline"
+                onClick={checkPendingPayments}
+                disabled={isCheckingPayments}
+              >
+                {isCheckingPayments ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                {isCheckingPayments ? 'Verificando...' : 'Verificar Pagamentos Pendentes'}
+              </Button>
+            )}
+            
+            {/* Exportar */}
+            {filteredRegistrations.length > 0 && (
               <Button
                 variant="outline"
                 onClick={() => {
@@ -471,8 +555,8 @@ export function RegistrationsManager({ eventId, accessToken }: RegistrationsMana
                 <Download className="h-4 w-4 mr-2" />
                 Exportar CSV
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

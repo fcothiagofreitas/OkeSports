@@ -35,7 +35,10 @@ export async function POST(request: NextRequest) {
       where: { id: registrationId },
       include: {
         event: {
-          include: {
+          select: {
+            id: true,
+            name: true,
+            eventDate: true,
             organizer: {
               select: {
                 mpAccessToken: true,
@@ -144,12 +147,26 @@ export async function POST(request: NextRequest) {
     const disableSplitInTest = process.env.DISABLE_SPLIT_PAYMENTS_TEST === 'true';
     const enableSplitPayments = supportsSplitPayments && platformFee > 0 && !(isTestMode && disableSplitInTest);
 
+    // Formatar data do evento para exibição
+    const eventDate = new Date(registration.event.eventDate);
+    const formattedEventDate = eventDate.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+
+    // Título mais descritivo para o item
+    const itemTitle = `Inscrição: ${registration.event.name} - ${registration.modality.name}`;
+    
+    // Descrição mais completa
+    const itemDescription = `Inscrição #${registration.registrationNumber} | Evento: ${formattedEventDate} | Participante: ${registration.participant.fullName}`;
+
     const preferenceData: any = {
       items: [
         {
           id: registration.modalityId,
-          title: `${registration.event.name} - ${registration.modality.name}`,
-          description: `Inscrição #${registration.registrationNumber}`,
+          title: itemTitle,
+          description: itemDescription,
           category_id: 'tickets',
           quantity: 1,
           unit_price: total,
@@ -170,17 +187,47 @@ export async function POST(request: NextRequest) {
       statement_descriptor: 'OKESPORTS',
       metadata: {
         registration_id: registrationId,
+        registration_number: registration.registrationNumber,
         event_id: registration.eventId,
+        event_name: registration.event.name,
+        event_date: registration.event.eventDate.toISOString(),
         modality_id: registration.modalityId,
+        modality_name: registration.modality.name,
         participant_id: registration.participantId,
+        participant_name: registration.participant.fullName,
+        participant_email: registration.participant.email,
+        subtotal: subtotal.toString(),
+        platform_fee: platformFee.toString(),
+        total: total.toString(),
       },
       binary_mode: false,
       expires: false,
+      // Configuração de métodos de pagamento
+      // Não excluímos nenhum método, permitindo todos (incluindo PIX)
+      payment_methods: {
+        excluded_payment_methods: [],
+        excluded_payment_types: [],
+        installments: null,
+      },
     };
 
     // Adicionar marketplace_fee se habilitado
     if (enableSplitPayments) {
       preferenceData.marketplace_fee = platformFee;
+    }
+
+    // Garantir que external_reference seja string e não nulo
+    if (!preferenceData.external_reference || typeof preferenceData.external_reference !== 'string') {
+      console.error('❌ ERRO: external_reference inválido:', preferenceData.external_reference);
+      return NextResponse.json(
+        { error: 'Erro interno: external_reference inválido' },
+        { status: 500 }
+      );
+    }
+
+    // Log para debug (apenas em desenvolvimento)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📋 Criando preferência com external_reference:', preferenceData.external_reference);
     }
 
     // Criar preferência
@@ -237,6 +284,15 @@ export async function POST(request: NextRequest) {
     // ============================================
     const preference = JSON.parse(responseText);
 
+    // Verificar se external_reference foi aceito pelo Mercado Pago
+    if (preference.external_reference !== registrationId) {
+      console.warn('⚠️ ATENÇÃO: external_reference não corresponde na resposta do MP');
+      console.warn('   Enviado:', registrationId);
+      console.warn('   Retornado:', preference.external_reference);
+    } else if (process.env.NODE_ENV === 'development') {
+      console.log('✅ external_reference confirmado pelo Mercado Pago:', preference.external_reference);
+    }
+
     // Usar sandbox_init_point em ambiente de teste
     const checkoutUrl = isTestMode && preference.sandbox_init_point
       ? preference.sandbox_init_point
@@ -246,6 +302,7 @@ export async function POST(request: NextRequest) {
       checkoutUrl,
       preferenceId: preference.id,
       marketplaceFee: preference.marketplace_fee || null,
+      externalReference: preference.external_reference || null,
       testMode: isTestMode,
     });
   } catch (error) {
