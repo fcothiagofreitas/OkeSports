@@ -183,6 +183,9 @@ export async function POST(request: NextRequest) {
       },
       auto_return: 'approved',
       notification_url: `${appUrl}/api/webhooks/mercadopago`,
+      // external_reference: OBRIGATÓRIO para conciliação financeira
+      // Deve ser um código único que correlaciona payment_id do MP com ID interno do sistema
+      // Usamos o registrationId (CUID) como referência única
       external_reference: registrationId,
       statement_descriptor: 'OKESPORTS',
       metadata: {
@@ -216,19 +219,42 @@ export async function POST(request: NextRequest) {
       preferenceData.marketplace_fee = platformFee;
     }
 
-    // Garantir que external_reference seja string e não nulo
+    // VALIDAÇÃO OBRIGATÓRIA: external_reference para conciliação financeira
+    // O Mercado Pago exige este campo para correlacionar payment_id com ID interno
     if (!preferenceData.external_reference || typeof preferenceData.external_reference !== 'string') {
-      console.error('❌ ERRO: external_reference inválido:', preferenceData.external_reference);
+      console.error('❌ ERRO CRÍTICO: external_reference inválido ou ausente');
+      console.error('   Valor recebido:', preferenceData.external_reference);
+      console.error('   Tipo:', typeof preferenceData.external_reference);
       return NextResponse.json(
-        { error: 'Erro interno: external_reference inválido' },
+        { 
+          error: 'Erro interno: external_reference inválido',
+          details: 'O campo external_reference é obrigatório para conciliação financeira',
+        },
         { status: 500 }
       );
     }
 
-    // Log para debug (apenas em desenvolvimento)
-    if (process.env.NODE_ENV === 'development') {
-      console.log('📋 Criando preferência com external_reference:', preferenceData.external_reference);
+    // Validar formato: deve ser string não vazia (CUID válido)
+    if (preferenceData.external_reference.trim().length === 0) {
+      console.error('❌ ERRO CRÍTICO: external_reference está vazio');
+      return NextResponse.json(
+        { 
+          error: 'Erro interno: external_reference vazio',
+          details: 'O campo external_reference não pode estar vazio',
+        },
+        { status: 500 }
+      );
     }
+
+    // Log para debug e auditoria
+    console.log('📋 Criando preferência de pagamento:', {
+      registrationId: registrationId,
+      external_reference: preferenceData.external_reference,
+      registrationNumber: registration.registrationNumber,
+      eventName: registration.event.name,
+      total: total,
+      hasMarketplaceFee: enableSplitPayments,
+    });
 
     // Criar preferência
     const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
@@ -284,13 +310,25 @@ export async function POST(request: NextRequest) {
     // ============================================
     const preference = JSON.parse(responseText);
 
-    // Verificar se external_reference foi aceito pelo Mercado Pago
-    if (preference.external_reference !== registrationId) {
-      console.warn('⚠️ ATENÇÃO: external_reference não corresponde na resposta do MP');
-      console.warn('   Enviado:', registrationId);
-      console.warn('   Retornado:', preference.external_reference);
-    } else if (process.env.NODE_ENV === 'development') {
-      console.log('✅ external_reference confirmado pelo Mercado Pago:', preference.external_reference);
+    // VALIDAÇÃO CRÍTICA: Verificar se external_reference foi aceito pelo Mercado Pago
+    // Este campo é obrigatório para conciliação financeira
+    if (!preference.external_reference) {
+      console.error('❌ ERRO CRÍTICO: Mercado Pago não retornou external_reference na resposta');
+      console.error('   Isso pode causar problemas na conciliação financeira');
+      console.error('   Preferência criada:', preference.id);
+      console.error('   Registration ID:', registrationId);
+    } else if (preference.external_reference !== registrationId) {
+      console.error('❌ ERRO CRÍTICO: external_reference não corresponde na resposta do MP');
+      console.error('   Enviado:', registrationId);
+      console.error('   Retornado:', preference.external_reference);
+      console.error('   Isso pode causar problemas na conciliação financeira');
+    } else {
+      console.log('✅ external_reference confirmado pelo Mercado Pago:', {
+        external_reference: preference.external_reference,
+        registrationId: registrationId,
+        preferenceId: preference.id,
+        status: 'OK - Conciliação financeira habilitada',
+      });
     }
 
     // Usar sandbox_init_point em ambiente de teste
