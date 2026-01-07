@@ -79,7 +79,7 @@ async function createEvent(request: NextRequest & { user: { userId: string } }) 
   } catch (error) {
     if (error instanceof ZodError) {
       return NextResponse.json(
-        { error: 'Dados inválidos', details: error.errors },
+        { error: 'Dados inválidos', details: error.issues },
         { status: 400 }
       );
     }
@@ -116,7 +116,7 @@ async function listEvents(request: NextRequest & { user: { userId: string } }) {
     if (!parsed.success) {
       console.warn('Parâmetros inválidos em /api/events:', parsed.error.flatten());
       return NextResponse.json(
-        { error: 'Parâmetros inválidos', details: parsed.error.errors },
+        { error: 'Parâmetros inválidos', details: parsed.error.issues },
         { status: 400 }
       );
     }
@@ -188,7 +188,7 @@ async function listEvents(request: NextRequest & { user: { userId: string } }) {
   } catch (error) {
     if (error instanceof ZodError) {
       return NextResponse.json(
-        { error: 'Parâmetros inválidos', details: error.errors },
+        { error: 'Parâmetros inválidos', details: error.issues },
         { status: 400 }
       );
     }

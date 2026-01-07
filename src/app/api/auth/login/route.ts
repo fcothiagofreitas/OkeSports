@@ -77,12 +77,25 @@ export async function POST(request: NextRequest) {
     };
 
     return NextResponse.json(response, { status: 200 });
-  } catch (error) {
+  } catch (error: any) {
     // Zod validation error
     if (error instanceof Error && error.name === 'ZodError') {
       return NextResponse.json(
         { error: 'Dados inválidos', details: error },
         { status: 400 }
+      );
+    }
+
+    // Prisma connection error
+    if (error?.code === 'P5010' || error?.message?.includes('Cannot fetch data from service')) {
+      console.error('❌ Erro de conexão com o banco de dados:', error);
+      console.error('💡 Verifique se:');
+      console.error('   1. O banco de dados está rodando');
+      console.error('   2. A variável DATABASE_URL está configurada corretamente no .env');
+      console.error('   3. Execute: npm run db:generate');
+      return NextResponse.json(
+        { error: 'Erro de conexão com o banco de dados. Verifique a configuração.' },
+        { status: 503 }
       );
     }
 
