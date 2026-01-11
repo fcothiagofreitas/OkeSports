@@ -50,8 +50,10 @@ export const checkoutParticipantSchema = z.object({
       return val;
     }),
   gender: z.enum(['MALE', 'FEMALE', 'OTHER', 'NOT_INFORMED']).optional(),
-  // Informações adicionais opcionais
-  shirtSize: z.enum(['PP', 'P', 'M', 'G', 'GG', 'XG']).optional(),
+  // Informações adicionais
+  shirtSize: z.enum(['PP', 'P', 'M', 'G', 'GG', 'XG'], {
+    required_error: 'Tamanho da camisa é obrigatório',
+  }),
   emergencyContact: z.string().optional(),
   emergencyPhone: z.string().optional(),
   medicalInfo: z.string().optional(),

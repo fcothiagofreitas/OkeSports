@@ -310,12 +310,23 @@ export default function InscricaoPage() {
         throw new Error('Cada participante deve ter um CPF único. Verifique se não há CPFs duplicados na lista.');
       }
 
+      // Validar dados obrigatórios de todos os participantes ANTES de processar
+      const validationErrors: string[] = [];
+      cart.items.forEach((item, index) => {
+        if (!item.fullName || !item.cpf || !item.email || !item.phone || !item.birthDate) {
+          validationErrors.push(`Participante ${index + 1} (${item.fullName || 'sem nome'}) está com dados incompletos. Verifique nome, CPF, email, telefone e data de nascimento.`);
+        }
+        if (!item.shirtSize) {
+          validationErrors.push(`Participante ${index + 1} (${item.fullName || 'sem nome'}) precisa selecionar o tamanho da camisa.`);
+        }
+      });
+
+      if (validationErrors.length > 0) {
+        throw new Error(validationErrors.join(' '));
+      }
+
       // Preparar dados dos participantes
       const participantsData = cart.items.map((item, index) => {
-        // Validar campos obrigatórios
-        if (!item.fullName || !item.cpf || !item.email || !item.phone || !item.birthDate) {
-          throw new Error(`Participante ${index + 1} (${item.fullName || 'sem nome'}) está com dados incompletos. Verifique nome, CPF, email, telefone e data de nascimento.`);
-        }
 
         // Converter birthDate para formato ISO datetime se necessário
         let birthDate = item.birthDate;
