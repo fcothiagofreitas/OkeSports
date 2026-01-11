@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useParticipantAuthStore } from '@/stores/participantAuthStore';
 import { ArrowLeft } from 'lucide-react';
+import { maskPhone, unmaskPhone } from '@/lib/masks';
 
 const registerSchema = z.object({
   fullName: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
@@ -57,7 +58,7 @@ export default function CadastroPage() {
           fullName: data.fullName,
           email: data.email,
           cpf: data.cpf,
-          phone: data.phone,
+          phone: unmaskPhone(data.phone), // Remove máscara antes de enviar
           password: data.password,
         }),
       });
@@ -154,14 +155,20 @@ export default function CadastroPage() {
               <Label htmlFor="phone">Telefone *</Label>
               <Input
                 id="phone"
-                placeholder="11999999999"
-                {...register('phone')}
+                placeholder="(00) 00000-0000"
+                {...register('phone', {
+                  onChange: (e) => {
+                    const masked = maskPhone(e.target.value);
+                    e.target.value = masked;
+                  },
+                })}
                 disabled={isLoading}
+                maxLength={15}
               />
               {errors.phone && (
                 <p className="text-sm text-red-600">{errors.phone.message}</p>
               )}
-              <p className="text-xs text-[hsl(var(--gray-600))]">Com DDD, apenas números</p>
+              <p className="text-xs text-[hsl(var(--gray-600))]">Com DDD</p>
             </div>
 
             <div className="space-y-2">

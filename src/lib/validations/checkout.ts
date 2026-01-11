@@ -13,8 +13,7 @@ export const checkoutParticipantSchema = z.object({
     .string()
     .min(3, 'Nome completo deve ter no mínimo 3 caracteres')
     .max(100)
-    .trim()
-    .regex(/^[a-zA-ZÀ-ÿ\s]+$/, 'Nome deve conter apenas letras'),
+    .trim(),
   cpf: z
     .string()
     .min(1)
@@ -24,11 +23,39 @@ export const checkoutParticipantSchema = z.object({
   email: z.string().min(1).email().toLowerCase().trim(),
   phone: z
     .string()
-    .min(1)
-    .regex(/^\(?([1-9]{2})\)?[\s-]?9?[0-9]{4}[\s-]?[0-9]{4}$/, 'Telefone inválido')
-    .transform((val) => val.replace(/\D/g, '')),
-  birthDate: z.string().datetime().or(z.date()),
+    .min(1, 'Telefone é obrigatório')
+    .transform((val) => val.replace(/\D/g, '')) // Remove formatação primeiro
+    .refine((val) => val.length >= 10 && val.length <= 11, {
+      message: 'Telefone deve ter 10 ou 11 dígitos',
+    })
+    .refine((val) => /^[1-9]/.test(val), {
+      message: 'DDD inválido',
+    }),
+  birthDate: z
+    .union([
+      z.string().datetime(), // ISO datetime completo
+      z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // Data simples YYYY-MM-DD
+      z.date(),
+    ])
+    .transform((val) => {
+      // Se for string no formato YYYY-MM-DD, converter para ISO datetime
+      if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
+        return new Date(val + 'T00:00:00').toISOString();
+      }
+      // Se já for Date, converter para ISO string
+      if (val instanceof Date) {
+        return val.toISOString();
+      }
+      // Se já for ISO string, retornar como está
+      return val;
+    }),
   gender: z.enum(['MALE', 'FEMALE', 'OTHER', 'NOT_INFORMED']).optional(),
+  // Informações adicionais opcionais
+  shirtSize: z.enum(['PP', 'P', 'M', 'G', 'GG', 'XG']).optional(),
+  emergencyContact: z.string().optional(),
+  emergencyPhone: z.string().optional(),
+  medicalInfo: z.string().optional(),
+  teamName: z.string().optional(),
 });
 
 /**
