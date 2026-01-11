@@ -4,8 +4,12 @@ import prisma from '@/lib/db';
 import { decryptOAuthTokens } from '@/lib/mercadopago';
 
 const createPreferenceSchema = z.object({
-  registrationId: z.string().cuid(),
-});
+  registrationId: z.string().cuid().optional(),
+  registrationIds: z.array(z.string().cuid()).optional(),
+}).refine(
+  (data) => data.registrationId || (data.registrationIds && data.registrationIds.length > 0),
+  { message: 'Deve fornecer registrationId ou registrationIds' }
+);
 
 /**
  * Cria uma preferência de pagamento no Mercado Pago
@@ -26,13 +30,26 @@ export async function POST(request: NextRequest) {
     // 1. VALIDAÇÃO E PREPARAÇÃO
     // ============================================
     const body = await request.json();
-    const { registrationId } = createPreferenceSchema.parse(body);
+    const { registrationId, registrationIds } = createPreferenceSchema.parse(body);
+
+    // Normalizar para array de IDs
+    const ids = registrationIds || (registrationId ? [registrationId] : []);
+    
+    if (ids.length === 0) {
+      return NextResponse.json(
+        { error: 'Nenhuma inscrição fornecida' },
+        { status: 400 }
+      );
+    }
 
     // ============================================
-    // 2. BUSCAR INSCRIÇÃO
+    // 2. BUSCAR INSCRIÇÕES
     // ============================================
-    const registration = await prisma.registration.findUnique({
-      where: { id: registrationId },
+    const registrations = await prisma.registration.findMany({
+      where: {
+        id: { in: ids },
+        status: 'PENDING', // Apenas inscrições pendentes
+      },
       include: {
         event: {
           select: {
@@ -60,16 +77,30 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (!registration) {
+    if (registrations.length === 0) {
       return NextResponse.json(
-        { error: 'Inscrição não encontrada' },
+        { error: 'Nenhuma inscrição pendente encontrada' },
         { status: 404 }
       );
     }
 
-    if (registration.status !== 'PENDING') {
+    if (registrations.length !== ids.length) {
       return NextResponse.json(
-        { error: 'Inscrição já foi processada' },
+        { error: `Apenas ${registrations.length} de ${ids.length} inscrição(ões) encontrada(s)` },
+        { status: 400 }
+      );
+    }
+
+    // Usar a primeira inscrição como referência principal (todas devem ser do mesmo evento/organizador)
+    const registration = registrations[0];
+    
+    // Validar que todas as inscrições são do mesmo evento e organizador
+    const sameEvent = registrations.every((r) => r.eventId === registration.eventId);
+    const sameOrganizer = registrations.every((r) => r.event.organizer.mpUserId === registration.event.organizer.mpUserId);
+    
+    if (!sameEvent || !sameOrganizer) {
+      return NextResponse.json(
+        { error: 'Todas as inscrições devem ser do mesmo evento e organizador' },
         { status: 400 }
       );
     }
@@ -136,12 +167,19 @@ export async function POST(request: NextRequest) {
     }
 
     // ============================================
-    // 4. CRIAR PREFERÊNCIA NO MERCADO PAGO
+    // 4. CALCULAR VALORES TOTAIS (MÚLTIPLAS INSCRIÇÕES)
     // ============================================
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    
+    // Calcular totais de todas as inscrições
+    const totalAmount = registrations.reduce((sum, r) => sum + Number(r.total), 0);
+    const totalSubtotal = registrations.reduce((sum, r) => sum + Number(r.subtotal), 0);
+    const totalPlatformFee = registrations.reduce((sum, r) => sum + Number(r.platformFee), 0);
+    
+    // Usar valores da primeira inscrição para referência (todos devem ter os mesmos valores unitários)
     const platformFee = Number(registration.platformFee);
-    const total = Number(registration.total);
-    const subtotal = Number(registration.subtotal);
+    const total = totalAmount; // Valor total de todas as inscrições
+    const subtotal = totalSubtotal;
 
     // Verificar se deve desabilitar split payments em teste
     const disableSplitInTest = process.env.DISABLE_SPLIT_PAYMENTS_TEST === 'true';
@@ -155,11 +193,14 @@ export async function POST(request: NextRequest) {
       year: 'numeric',
     });
 
-    // Título mais descritivo para o item
-    const itemTitle = `Inscrição: ${registration.event.name} - ${registration.modality.name}`;
+    // Título e descrição para múltiplas inscrições
+    const itemTitle = registrations.length === 1
+      ? `Inscrição: ${registration.event.name} - ${registration.modality.name}`
+      : `${registrations.length} Inscrições: ${registration.event.name}`;
     
-    // Descrição mais completa
-    const itemDescription = `Inscrição #${registration.registrationNumber} | Evento: ${formattedEventDate} | Participante: ${registration.participant.fullName}`;
+    const itemDescription = registrations.length === 1
+      ? `Inscrição #${registration.registrationNumber} | Evento: ${formattedEventDate} | Participante: ${registration.participant.fullName}`
+      : `${registrations.length} inscrição(ões) | Evento: ${formattedEventDate} | Números: ${registrations.map((r) => `#${r.registrationNumber}`).join(', ')}`;
 
     const preferenceData: any = {
       items: [
@@ -168,8 +209,8 @@ export async function POST(request: NextRequest) {
           title: itemTitle,
           description: itemDescription,
           category_id: 'tickets',
-          quantity: 1,
-          unit_price: total,
+          quantity: registrations.length, // Quantidade = número de inscrições
+          unit_price: Number(registration.total), // Preço unitário (de uma inscrição)
         },
       ],
       payer: {
@@ -177,20 +218,23 @@ export async function POST(request: NextRequest) {
         email: registration.participant.email,
       },
       back_urls: {
-        success: `${appUrl}/inscricao/sucesso?id=${registrationId}`,
-        failure: `${appUrl}/inscricao/falha?id=${registrationId}`,
-        pending: `${appUrl}/inscricao/pendente?id=${registrationId}`,
+        success: `${appUrl}/inscricao/sucesso?ids=${ids.join(',')}`,
+        failure: `${appUrl}/inscricao/falha?ids=${ids.join(',')}`,
+        pending: `${appUrl}/inscricao/pendente?ids=${ids.join(',')}`,
       },
       auto_return: 'approved',
       notification_url: `${appUrl}/api/webhooks/mercadopago`,
       // external_reference: OBRIGATÓRIO para conciliação financeira
       // Deve ser um código único que correlaciona payment_id do MP com ID interno do sistema
-      // Usamos o registrationId (CUID) como referência única
-      external_reference: registrationId,
+      // Para múltiplas inscrições, usamos o primeiro ID como referência principal
+      // e incluímos todos os IDs no metadata
+      external_reference: ids[0],
       statement_descriptor: 'OKESPORTS',
       metadata: {
-        registration_id: registrationId,
-        registration_number: registration.registrationNumber,
+        registration_id: ids[0], // ID principal (primeira inscrição)
+        registration_ids: ids.join(','), // Todos os IDs separados por vírgula
+        registration_count: registrations.length.toString(),
+        registration_numbers: registrations.map((r) => r.registrationNumber).join(','),
         event_id: registration.eventId,
         event_name: registration.event.name,
         event_date: registration.event.eventDate.toISOString(),
@@ -200,7 +244,7 @@ export async function POST(request: NextRequest) {
         participant_name: registration.participant.fullName,
         participant_email: registration.participant.email,
         subtotal: subtotal.toString(),
-        platform_fee: platformFee.toString(),
+        platform_fee: totalPlatformFee.toString(),
         total: total.toString(),
       },
       binary_mode: false,
@@ -214,9 +258,9 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    // Adicionar marketplace_fee se habilitado
+    // Adicionar marketplace_fee se habilitado (taxa total de todas as inscrições)
     if (enableSplitPayments) {
-      preferenceData.marketplace_fee = platformFee;
+      preferenceData.marketplace_fee = totalPlatformFee;
     }
 
     // VALIDAÇÃO OBRIGATÓRIA: external_reference para conciliação financeira
@@ -248,12 +292,16 @@ export async function POST(request: NextRequest) {
 
     // Log para debug e auditoria
     console.log('📋 Criando preferência de pagamento:', {
-      registrationId: registrationId,
+      registrationIds: ids,
+      registrationCount: registrations.length,
       external_reference: preferenceData.external_reference,
-      registrationNumber: registration.registrationNumber,
+      registrationNumbers: registrations.map((r) => r.registrationNumber),
       eventName: registration.event.name,
       total: total,
+      unitPrice: Number(registration.total),
+      quantity: registrations.length,
       hasMarketplaceFee: enableSplitPayments,
+      marketplaceFee: totalPlatformFee,
     });
 
     // Criar preferência
@@ -312,20 +360,22 @@ export async function POST(request: NextRequest) {
 
     // VALIDAÇÃO CRÍTICA: Verificar se external_reference foi aceito pelo Mercado Pago
     // Este campo é obrigatório para conciliação financeira
+    const primaryRegistrationId = ids[0];
     if (!preference.external_reference) {
       console.error('❌ ERRO CRÍTICO: Mercado Pago não retornou external_reference na resposta');
       console.error('   Isso pode causar problemas na conciliação financeira');
       console.error('   Preferência criada:', preference.id);
-      console.error('   Registration ID:', registrationId);
-    } else if (preference.external_reference !== registrationId) {
+      console.error('   Registration IDs:', ids);
+    } else if (preference.external_reference !== primaryRegistrationId) {
       console.error('❌ ERRO CRÍTICO: external_reference não corresponde na resposta do MP');
-      console.error('   Enviado:', registrationId);
+      console.error('   Enviado:', primaryRegistrationId);
       console.error('   Retornado:', preference.external_reference);
       console.error('   Isso pode causar problemas na conciliação financeira');
     } else {
       console.log('✅ external_reference confirmado pelo Mercado Pago:', {
         external_reference: preference.external_reference,
-        registrationId: registrationId,
+        registrationIds: ids,
+        registrationCount: registrations.length,
         preferenceId: preference.id,
         status: 'OK - Conciliação financeira habilitada',
       });

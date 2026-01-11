@@ -103,20 +103,25 @@ export default function MinhaContaPage() {
       let groupKey: string;
       
       if (reg.paymentId) {
-        // Extrair parte comum do paymentId (antes do _)
+        // Extrair parte comum do paymentId (tudo exceto a última parte que é o reg.id)
         // Exemplo: "mock_1234567890_reg1" -> prefixo "mock_1234567890"
+        // Exemplo: "preference123_reg1" -> prefixo "preference123"
         // Todas as inscrições do mesmo checkout compartilham o mesmo prefixo
-        const paymentPrefix = reg.paymentId.split('_').slice(0, 2).join('_'); // Pega "mock_1234567890"
+        const parts = reg.paymentId.split('_');
+        const paymentPrefix = parts.slice(0, -1).join('_'); // Remove a última parte (reg.id)
         groupKey = `payment_${paymentPrefix}`;
       } else {
-        // Agrupar por buyerId + createdAt (sem eventId, tolerância de 1 minuto)
+        // Agrupar por buyerId + createdAt (tolerância de 1 minuto)
         // Isso agrupa inscrições criadas juntas pelo mesmo comprador (mesmo pedido)
         const createdAtDate = new Date(reg.createdAt);
         // Arredondar para o minuto (sem segundos) para agrupar inscrições criadas no mesmo minuto
         const roundedDate = new Date(createdAtDate);
         roundedDate.setSeconds(0, 0);
+        roundedDate.setMilliseconds(0);
         
-        groupKey = `${reg.buyerId || reg.participantId}_${roundedDate.toISOString()}`;
+        // Usar buyerId se disponível, senão usar participantId (para inscrições antigas)
+        const buyerId = reg.buyerId || reg.participantId;
+        groupKey = `order_${buyerId}_${roundedDate.toISOString()}`;
       }
       
       if (!groups.has(groupKey)) {

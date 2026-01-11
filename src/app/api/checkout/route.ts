@@ -429,7 +429,7 @@ export async function POST(request: NextRequest) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            registrationId: registrations[0].id,
+            registrationIds: registrations.map((r) => r.id), // Enviar TODAS as inscrições
           }),
         });
 

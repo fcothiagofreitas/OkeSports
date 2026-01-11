@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useState, useEffect, useRef } from 'react';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import type { CartParticipant } from '@/hooks/useCart';
 import { maskPhone, unmaskPhone } from '@/lib/masks';
+import { useParticipantAuthStore } from '@/stores/participantAuthStore';
 
 const participantSchema = z.object({
   fullName: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
@@ -63,34 +64,137 @@ export function AddParticipantModal({
   kitShirtRequired = false,
 }: AddParticipantModalProps) {
   const isEditing = !!participant;
+  const { accessToken } = useParticipantAuthStore();
+  const [recentParticipants, setRecentParticipants] = useState<Array<{
+    id: string;
+    fullName: string;
+    cpf: string;
+    email: string;
+    phone: string;
+    birthDate: string;
+    gender?: string;
+    shirtSize?: string | null;
+  }>>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
+    control,
+    setValue,
   } = useForm<ParticipantFormData>({
     resolver: zodResolver(participantSchema),
+    defaultValues: {
+      fullName: '',
+      cpf: '',
+      email: '',
+      phone: '',
+      birthDate: '',
+      gender: 'NOT_INFORMED',
+      shirtSize: undefined,
+      emergencyContact: '',
+      emergencyPhone: '',
+      medicalInfo: '',
+      teamName: '',
+    },
   });
+
+
+  // Buscar participantes recentes
+  useEffect(() => {
+    if (open && !isEditing && accessToken) {
+      fetchRecentParticipants();
+    }
+  }, [open, isEditing, accessToken]);
+
+  const fetchRecentParticipants = async () => {
+    try {
+      const response = await fetch('/api/participants/recent', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setRecentParticipants(data.participants || []);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar participantes recentes:', error);
+    }
+  };
+
+  // Preencher campos ao selecionar participante
+  const handleSelectParticipant = (selectedParticipant: typeof recentParticipants[0]) => {
+    reset({
+      fullName: selectedParticipant.fullName,
+      cpf: selectedParticipant.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'),
+      email: selectedParticipant.email,
+      phone: maskPhone(selectedParticipant.phone),
+      birthDate: selectedParticipant.birthDate ? new Date(selectedParticipant.birthDate).toISOString().split('T')[0] : '',
+      gender: (selectedParticipant.gender as any) || 'NOT_INFORMED',
+      shirtSize: selectedParticipant.shirtSize as any || undefined,
+      emergencyContact: '',
+      emergencyPhone: '',
+      medicalInfo: '',
+      teamName: '',
+    });
+    setShowSuggestions(false);
+  };
+
+  // Fechar sugestões ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node) &&
+        nameInputRef.current &&
+        !nameInputRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
 
   useEffect(() => {
     if (participant) {
       reset({
-        fullName: participant.fullName,
-        cpf: participant.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'),
-        email: participant.email,
-        phone: maskPhone(participant.phone), // Aplicar máscara ao carregar
-        birthDate: participant.birthDate,
-        gender: participant.gender,
-        shirtSize: participant.shirtSize,
-        emergencyContact: participant.emergencyContact,
-        emergencyPhone: participant.emergencyPhone ? maskPhone(participant.emergencyPhone) : undefined, // Aplicar máscara ao carregar
-        medicalInfo: participant.medicalInfo,
-        teamName: participant.teamName,
+        fullName: participant.fullName || '',
+        cpf: participant.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') || '',
+        email: participant.email || '',
+        phone: maskPhone(participant.phone) || '',
+        birthDate: participant.birthDate || '',
+        gender: participant.gender || 'NOT_INFORMED',
+        shirtSize: participant.shirtSize || undefined,
+        emergencyContact: participant.emergencyContact || '',
+        emergencyPhone: participant.emergencyPhone ? maskPhone(participant.emergencyPhone) : '',
+        medicalInfo: participant.medicalInfo || '',
+        teamName: participant.teamName || '',
       });
     } else {
-      reset({});
+      reset({
+        fullName: '',
+        cpf: '',
+        email: '',
+        phone: '',
+        birthDate: '',
+        gender: 'NOT_INFORMED',
+        shirtSize: undefined,
+        emergencyContact: '',
+        emergencyPhone: '',
+        medicalInfo: '',
+        teamName: '',
+      });
     }
+    setShowSuggestions(false);
   }, [participant, reset]);
 
   const onSubmit = (data: ParticipantFormData) => {
@@ -129,9 +233,55 @@ export function AddParticipantModal({
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
+            <div className="space-y-2 relative">
               <Label htmlFor="fullName">Nome Completo *</Label>
-              <Input id="fullName" {...register('fullName')} />
+              <Controller
+                name="fullName"
+                control={control}
+                render={({ field }) => (
+                  <>
+                    <Input
+                      id="fullName"
+                      {...field}
+                      value={field.value || ''}
+                      ref={(e) => {
+                        field.ref(e);
+                        nameInputRef.current = e;
+                      }}
+                      onFocus={() => {
+                        if (!isEditing && recentParticipants.length > 0) {
+                          setShowSuggestions(true);
+                        }
+                      }}
+                      onChange={(e) => {
+                        field.onChange(e);
+                        if (!isEditing && recentParticipants.length > 0) {
+                          setShowSuggestions(true);
+                        }
+                      }}
+                      autoComplete="off"
+                      placeholder="Digite o nome completo"
+                    />
+                    {showSuggestions && !isEditing && recentParticipants.length > 0 && (
+                      <div
+                        ref={suggestionsRef}
+                        className="absolute z-50 w-full mt-1 bg-white border border-neutral-light-gray rounded-md shadow-lg max-h-60 overflow-y-auto"
+                      >
+                        {recentParticipants.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => handleSelectParticipant(p)}
+                            className="w-full text-left px-4 py-2 hover:bg-neutral-off-white transition-colors border-b border-neutral-light-gray last:border-b-0"
+                          >
+                            <div className="font-medium text-neutral-charcoal">{p.fullName}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              />
               {errors.fullName && (
                 <p className="text-sm text-accent-danger">{errors.fullName.message}</p>
               )}
@@ -156,18 +306,21 @@ export function AddParticipantModal({
 
             <div className="space-y-2">
               <Label htmlFor="phone">Telefone *</Label>
-              <Input
-                id="phone"
-                placeholder="(00) 00000-0000"
-                {...register('phone', {
-                  onChange: (e) => {
-                    const masked = maskPhone(e.target.value);
-                    e.target.value = masked;
-                    // Atualizar valor no react-hook-form
-                    register('phone').onChange(e);
-                  },
-                })}
-                maxLength={15}
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    id="phone"
+                    placeholder="(00) 00000-0000"
+                    value={field.value || ''}
+                    onChange={(e) => {
+                      const masked = maskPhone(e.target.value);
+                      field.onChange(masked);
+                    }}
+                    maxLength={15}
+                  />
+                )}
               />
               {errors.phone && <p className="text-sm text-accent-danger">{errors.phone.message}</p>}
             </div>
@@ -225,16 +378,21 @@ export function AddParticipantModal({
 
             <div className="space-y-2">
               <Label htmlFor="emergencyPhone">Telefone de Emergência</Label>
-              <Input
-                id="emergencyPhone"
-                placeholder="(00) 00000-0000"
-                {...register('emergencyPhone', {
-                  onChange: (e) => {
-                    const masked = maskPhone(e.target.value);
-                    e.target.value = masked;
-                  },
-                })}
-                maxLength={15}
+              <Controller
+                name="emergencyPhone"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    id="emergencyPhone"
+                    placeholder="(00) 00000-0000"
+                    value={field.value || ''}
+                    onChange={(e) => {
+                      const masked = maskPhone(e.target.value);
+                      field.onChange(masked);
+                    }}
+                    maxLength={15}
+                  />
+                )}
               />
             </div>
           </div>

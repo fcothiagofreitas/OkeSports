@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -65,6 +65,33 @@ export default function InscricaoPage() {
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingParticipant, setEditingParticipant] = useState<CartParticipant | null>(null);
+  const [participantShirtSize, setParticipantShirtSize] = useState<string | null>(null);
+
+  // Buscar shirtSize do participante logado
+  const fetchParticipantData = useCallback(async () => {
+    if (!participant || !accessToken) return;
+    
+    try {
+      const response = await fetch('/api/participants/me', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setParticipantShirtSize(data.shirtSize || null);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar dados do participante:', error);
+    }
+  }, [participant, accessToken]);
+
+  useEffect(() => {
+    if (participant && accessToken) {
+      fetchParticipantData();
+    }
+  }, [participant, accessToken, fetchParticipantData]);
 
   // Inicializar lista de participantes com participante logado
   const initialParticipant: CartParticipant | undefined = participant
@@ -80,6 +107,16 @@ export default function InscricaoPage() {
     : undefined;
 
   const { cart, addParticipant, updateParticipant, removeParticipant, setCouponCode: setCartCouponCode, itemCount } = useCart(initialParticipant);
+
+  // Atualizar shirtSize do participante logado quando for carregado
+  useEffect(() => {
+    if (participantShirtSize && participant && cart.items.length > 0) {
+      const selfParticipant = cart.items.find((item) => item.id === 'self');
+      if (selfParticipant && !selfParticipant.shirtSize) {
+        updateParticipant('self', { shirtSize: participantShirtSize as any });
+      }
+    }
+  }, [participantShirtSize, participant, cart.items, updateParticipant]);
 
   const {
     register,
