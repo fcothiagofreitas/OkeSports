@@ -94,6 +94,27 @@ async function updateEvent(
       );
     }
 
+    // Em produção, verificar se Mercado Pago está conectado ao publicar evento
+    if (
+      process.env.NODE_ENV === 'production' &&
+      validatedData.status === 'PUBLISHED' &&
+      existingEvent.status !== 'PUBLISHED'
+    ) {
+      const organizer = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { mpConnected: true, mpUserId: true },
+      });
+
+      if (!organizer?.mpConnected || !organizer?.mpUserId) {
+        return NextResponse.json(
+          {
+            error: 'É necessário conectar sua conta do Mercado Pago antes de publicar um evento',
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // Converter datas se fornecidas
     const updateData: any = { ...validatedData };
 
