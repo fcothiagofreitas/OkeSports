@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -50,8 +50,10 @@ interface EventData {
 export default function InscricaoPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const slug = params.slug as string;
   const modalityId = params.modalityId as string;
+  const registrationId = searchParams.get('registrationId');
 
   const { participant, accessToken, isAuthenticated } = useParticipantAuthStore();
   const [isLoading, setIsLoading] = useState(false);
@@ -59,6 +61,10 @@ export default function InscricaoPage() {
   const [eventData, setEventData] = useState<EventData | null>(null);
   const [loadingEvent, setLoadingEvent] = useState(true);
   const [existingRegistration, setExistingRegistration] = useState<any>(null);
+  const [groupRegistrations, setGroupRegistrations] = useState<any[]>([]);
+  const [groupTotal, setGroupTotal] = useState<number>(0);
+  const [groupSubtotal, setGroupSubtotal] = useState<number>(0);
+  const [groupPlatformFee, setGroupPlatformFee] = useState<number>(0);
   const [checkingRegistration, setCheckingRegistration] = useState(true);
   const [couponCode, setCouponCode] = useState('');
   const [pricing, setPricing] = useState<any>(null);
@@ -211,11 +217,47 @@ export default function InscricaoPage() {
     }
   };
 
-  // Verificar se já existe inscrição
+  // Verificar se já existe inscrição ou buscar grupo de inscrições
   useEffect(() => {
     async function checkExistingRegistration() {
       if (!isAuthenticated || !accessToken || !eventData) return;
 
+      // Se há registrationId na URL, buscar todas as inscrições do grupo
+      if (registrationId) {
+        try {
+          const response = await fetch(
+            `/api/registrations/group?registrationId=${registrationId}`,
+            {
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
+            }
+          );
+
+          if (response.ok) {
+            const data = await response.json();
+            setGroupRegistrations(data.registrations);
+            setGroupTotal(data.total);
+            setGroupSubtotal(data.subtotal);
+            setGroupPlatformFee(data.platformFee);
+            // Usar a primeira inscrição como referência para status
+            if (data.registrations.length > 0) {
+              setExistingRegistration({
+                ...data.registrations[0],
+                paymentStatus: data.paymentStatus,
+                status: data.status,
+              });
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching registration group:', err);
+        } finally {
+          setCheckingRegistration(false);
+        }
+        return;
+      }
+
+      // Caso contrário, verificar inscrição individual (comportamento original)
       try {
         const response = await fetch(
           `/api/registrations/check?eventId=${eventData.id}&modalityId=${modalityId}`,
@@ -244,7 +286,7 @@ export default function InscricaoPage() {
     }
 
     checkExistingRegistration();
-  }, [isAuthenticated, accessToken, eventData, modalityId]);
+  }, [isAuthenticated, accessToken, eventData, modalityId, registrationId]);
 
   const handlePayment = async () => {
     if (!existingRegistration) return;
@@ -253,13 +295,19 @@ export default function InscricaoPage() {
       setIsLoading(true);
       setError(null);
 
+      // Se há grupo de inscrições, usar todas; senão, usar apenas a inscrição individual
+      const registrationIds = groupRegistrations.length > 0
+        ? groupRegistrations.map((reg) => reg.id)
+        : [existingRegistration.id];
+
       const checkoutResponse = await fetch('/api/payments/create-preference', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
-          registrationId: existingRegistration.id,
+          registrationIds,
         }),
       });
 
@@ -555,17 +603,9 @@ export default function InscricaoPage() {
 
                 <div className="bg-neutral-off-white rounded-md p-6 mb-6 text-left border border-neutral-light-gray">
                   <h4 className="font-bold text-neutral-charcoal mb-4">Detalhes da Inscrição</h4>
-                  <div className="space-y-2 text-sm">
+                  <div className="space-y-2 text-sm mb-4">
                     <p>
-                      <span className="text-neutral-gray">Número:</span>{' '}
-                      <span className="font-mono font-medium">#{existingRegistration.registrationNumber}</span>
-                    </p>
-                    <p>
-                      <span className="text-neutral-gray">Evento:</span> {existingRegistration.event.name}
-                    </p>
-                    <p>
-                      <span className="text-neutral-gray">Modalidade:</span>{' '}
-                      {existingRegistration.modality.name}
+                      <span className="text-neutral-gray">Evento:</span> {existingRegistration.event?.name || eventData?.name}
                     </p>
                     <p>
                       <span className="text-neutral-gray">Data da inscrição:</span>{' '}
@@ -573,40 +613,145 @@ export default function InscricaoPage() {
                     </p>
                   </div>
 
-                  <div className="mt-4 pt-4 border-t border-neutral-light-gray">
-                    <h5 className="font-bold text-neutral-charcoal mb-3">Valores</h5>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-neutral-gray">
-                          Inscrição x 1
-                        </span>
-                        <span className="font-medium">
-                          {new Intl.NumberFormat('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          }).format(existingRegistration.subtotal)}
-                        </span>
+                  {/* Mostrar todas as inscrições do grupo se houver */}
+                  {groupRegistrations.length > 0 ? (
+                    <>
+                      <div className="mt-4 pt-4 border-t border-neutral-light-gray">
+                        <h5 className="font-bold text-neutral-charcoal mb-3">Participantes</h5>
+                        <div className="space-y-3">
+                          {groupRegistrations.map((reg) => (
+                            <div
+                              key={reg.id}
+                              className="p-3 bg-white rounded border border-neutral-light-gray"
+                            >
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <p className="font-medium text-neutral-charcoal">
+                                    {reg.participant.fullName}
+                                    {reg.participant.id === participant?.id && (
+                                      <span className="text-neutral-gray text-sm ml-2">(Você)</span>
+                                    )}
+                                  </p>
+                                  <div className="grid grid-cols-2 gap-2 mt-1 text-xs text-neutral-gray">
+                                    <div>
+                                      <span>CPF: </span>
+                                      <span className="font-medium">{reg.participant.cpf}</span>
+                                    </div>
+                                    <div>
+                                      <span>Email: </span>
+                                      <span className="font-medium">{reg.participant.email}</span>
+                                    </div>
+                                    <div>
+                                      <span>Telefone: </span>
+                                      <span className="font-medium">{reg.participant.phone}</span>
+                                    </div>
+                                    <div>
+                                      <span>Número: </span>
+                                      <span className="font-medium">#{reg.registrationNumber}</span>
+                                    </div>
+                                    <div>
+                                      <span>Modalidade: </span>
+                                      <span className="font-medium">{reg.modality.name}</span>
+                                    </div>
+                                    {reg.shirtSize && (
+                                      <div>
+                                        <span>Camiseta: </span>
+                                        <span className="font-medium">{reg.shirtSize}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-neutral-gray">Taxa de serviço:</span>
-                        <span className="font-medium">
-                          {new Intl.NumberFormat('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          }).format(existingRegistration.platformFee)}
-                        </span>
+
+                      <div className="mt-4 pt-4 border-t border-neutral-light-gray">
+                        <h5 className="font-bold text-neutral-charcoal mb-3">Resumo Financeiro</h5>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-neutral-gray">
+                              Inscrição x {groupRegistrations.length}
+                            </span>
+                            <span className="font-medium">
+                              {new Intl.NumberFormat('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              }).format(groupSubtotal)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-neutral-gray">Taxa de serviço:</span>
+                            <span className="font-medium">
+                              {new Intl.NumberFormat('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              }).format(groupPlatformFee)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between pt-2 border-t border-neutral-light-gray">
+                            <span className="font-bold text-neutral-charcoal">Total:</span>
+                            <span className="font-bold text-primary">
+                              {new Intl.NumberFormat('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              }).format(groupTotal)}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex justify-between pt-2 border-t border-neutral-light-gray">
-                        <span className="font-bold text-neutral-charcoal">Total:</span>
-                        <span className="font-bold text-primary">
-                          {new Intl.NumberFormat('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          }).format(existingRegistration.total)}
-                        </span>
+                    </>
+                  ) : (
+                    // Fallback para inscrição individual (comportamento original)
+                    <>
+                      <div className="space-y-2 text-sm">
+                        <p>
+                          <span className="text-neutral-gray">Número:</span>{' '}
+                          <span className="font-mono font-medium">#{existingRegistration.registrationNumber}</span>
+                        </p>
+                        <p>
+                          <span className="text-neutral-gray">Modalidade:</span>{' '}
+                          {existingRegistration.modality?.name}
+                        </p>
                       </div>
-                    </div>
-                  </div>
+
+                      <div className="mt-4 pt-4 border-t border-neutral-light-gray">
+                        <h5 className="font-bold text-neutral-charcoal mb-3">Valores</h5>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-neutral-gray">
+                              Inscrição x 1
+                            </span>
+                            <span className="font-medium">
+                              {new Intl.NumberFormat('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              }).format(existingRegistration.subtotal)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-neutral-gray">Taxa de serviço:</span>
+                            <span className="font-medium">
+                              {new Intl.NumberFormat('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              }).format(existingRegistration.platformFee)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between pt-2 border-t border-neutral-light-gray">
+                            <span className="font-bold text-neutral-charcoal">Total:</span>
+                            <span className="font-bold text-primary">
+                              {new Intl.NumberFormat('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              }).format(existingRegistration.total)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {existingRegistration.paymentStatus !== 'APPROVED' && (

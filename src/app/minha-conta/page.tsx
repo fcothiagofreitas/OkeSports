@@ -56,6 +56,7 @@ export default function MinhaContaPage() {
   const [editingShirtSize, setEditingShirtSize] = useState<{ registrationId: string; shirtSize: string | null } | null>(null);
   const [updatingShirtSize, setUpdatingShirtSize] = useState(false);
   const [cancellingRegistrationId, setCancellingRegistrationId] = useState<string | null>(null);
+  const [processingPaymentId, setProcessingPaymentId] = useState<string | null>(null);
 
   useEffect(() => {
     setIsHydrated(true);
@@ -232,6 +233,45 @@ export default function MinhaContaPage() {
       alert(error instanceof Error ? error.message : 'Erro desconhecido');
     } finally {
       setCancellingRegistrationId(null);
+    }
+  };
+
+  const handlePayment = async (group: RegistrationGroup) => {
+    try {
+      setProcessingPaymentId(group.id);
+      
+      const registrationIds = group.registrations.map((r) => r.id);
+
+      // Criar preferência no Mercado Pago
+      const response = await fetch('/api/payments/create-preference', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          registrationIds,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao processar pagamento');
+      }
+
+      const data = await response.json();
+
+      if (data.checkoutUrl) {
+        // Redirecionar para o checkout do Mercado Pago
+        window.location.href = data.checkoutUrl;
+      } else {
+        // Fallback: redirecionar para página de pendente
+        window.location.href = `/inscricao/pendente?ids=${registrationIds.join(',')}`;
+      }
+    } catch (error) {
+      console.error('Erro ao processar pagamento:', error);
+      alert(error instanceof Error ? error.message : 'Erro ao processar pagamento');
+      setProcessingPaymentId(null);
     }
   };
 
@@ -492,26 +532,26 @@ export default function MinhaContaPage() {
                         <div className="mt-4 flex gap-2 flex-wrap">
                           {group.status === 'PENDING' ? (
                             <>
-                              {group.registrations.length === 1 ? (
-                                <Link
-                                  href={`/e/${group.event.slug}/inscricao/${group.registrations[0].modality.id}`}
-                                  className="flex-1 min-w-[120px]"
-                                >
-                                  <Button size="sm" className="w-full">
-                                    Realizar Pagamento
-                                  </Button>
-                                </Link>
-                              ) : (
-                                // Múltiplas inscrições: redirecionar para página de pagamento pendente com todos os IDs
-                                <Link
-                                  href={`/inscricao/pendente?ids=${group.registrations.map((r) => r.id).join(',')}`}
-                                  className="flex-1 min-w-[120px]"
-                                >
-                                  <Button size="sm" className="w-full">
-                                    Realizar Pagamento
-                                  </Button>
-                                </Link>
-                              )}
+                              <Button
+                                size="sm"
+                                className="flex-1 min-w-[120px] w-full"
+                                onClick={() => handlePayment(group)}
+                                disabled={processingPaymentId === group.id}
+                              >
+                                {processingPaymentId === group.id ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Processando...
+                                  </>
+                                ) : (
+                                  'Realizar Pagamento'
+                                )}
+                              </Button>
+                              <Link href={`/e/${group.event.slug}/inscricao/${group.registrations[0].modality.id}?registrationId=${group.registrations[0].id}`} className="flex-1 min-w-[120px]">
+                                <Button variant="outline" size="sm" className="w-full">
+                                  Ver Inscrição
+                                </Button>
+                              </Link>
                               <Link href={`/e/${group.event.slug}`} className="flex-1 min-w-[120px]">
                                 <Button variant="outline" size="sm" className="w-full">
                                   Ver Evento
@@ -533,6 +573,11 @@ export default function MinhaContaPage() {
                             </>
                           ) : group.status === 'CONFIRMED' ? (
                             <>
+                              <Link href={`/e/${group.event.slug}/inscricao/${group.registrations[0].modality.id}?registrationId=${group.registrations[0].id}`} className="flex-1 min-w-[120px]">
+                                <Button variant="outline" size="sm" className="w-full">
+                                  Ver Inscrição
+                                </Button>
+                              </Link>
                               <Link href={`/e/${group.event.slug}`} className="flex-1 min-w-[120px]">
                                 <Button variant="outline" size="sm" className="w-full">
                                   Ver Evento
@@ -557,6 +602,11 @@ export default function MinhaContaPage() {
                             </>
                           ) : (
                             <>
+                              <Link href={`/e/${group.event.slug}/inscricao/${group.registrations[0].modality.id}?registrationId=${group.registrations[0].id}`} className="flex-1 min-w-[120px]">
+                                <Button variant="outline" size="sm" className="w-full">
+                                  Ver Inscrição
+                                </Button>
+                              </Link>
                               <Link href={`/e/${group.event.slug}`} className="flex-1 min-w-[120px]">
                                 <Button variant="outline" size="sm" className="w-full">
                                   Ver Evento
