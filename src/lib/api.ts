@@ -34,7 +34,9 @@ export async function fetchAPI(
 
   // Se token inválido/expirado, fazer logout e redirecionar
   if (response.status === 401) {
-    const data = await response.json();
+    // Clonar response para poder ler o body sem consumir o stream original
+    const clonedResponse = response.clone();
+    const data = await clonedResponse.json();
     if (
       data.error === 'Token inválido ou expirado' ||
       data.error === 'Token inválido' ||

@@ -37,12 +37,29 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 3. Verificar se já existe inscrição
-    const existingRegistration = await prisma.registration.findFirst({
+    // Em desenvolvimento, permitir inscrições repetidas (não verificar existência)
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    
+    if (isDevelopment) {
+      console.log('[CHECK REGISTRATION] ⚠️ MODO DESENVOLVIMENTO: Retornando exists=false para permitir testes');
+      return NextResponse.json(
+        {
+          exists: false,
+          hasCancelledRegistration: false,
+        },
+        { status: 200 }
+      );
+    }
+
+    // 3. Verificar se já existe inscrição ATIVA (ignorar canceladas para permitir re-inscrição)
+    const activeRegistration = await prisma.registration.findFirst({
       where: {
         participantId,
         eventId,
         modalityId,
+        status: {
+          in: ['PENDING', 'CONFIRMED'], // Apenas inscrições ativas
+        },
       },
       include: {
         event: {
@@ -63,27 +80,52 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    if (!existingRegistration) {
-      return NextResponse.json({ exists: false }, { status: 200 });
+    // 4. Verificar se existe inscrição cancelada (para histórico/informação)
+    const cancelledRegistration = await prisma.registration.findFirst({
+      where: {
+        participantId,
+        eventId,
+        modalityId,
+        status: 'CANCELLED',
+      },
+      orderBy: {
+        cancelledAt: 'desc',
+      },
+      select: {
+        cancelledAt: true,
+        status: true,
+      },
+    });
+
+    if (!activeRegistration) {
+      return NextResponse.json(
+        {
+          exists: false,
+          hasCancelledRegistration: !!cancelledRegistration,
+          cancelledAt: cancelledRegistration?.cancelledAt?.toISOString(),
+        },
+        { status: 200 }
+      );
     }
 
-    // 4. Retornar dados da inscrição existente
+    // 5. Retornar dados da inscrição ativa existente
     return NextResponse.json(
       {
         exists: true,
+        hasCancelledRegistration: !!cancelledRegistration,
         registration: {
-          id: existingRegistration.id,
-          registrationNumber: existingRegistration.registrationNumber,
-          status: existingRegistration.status,
-          paymentStatus: existingRegistration.paymentStatus,
-          basePrice: Number(existingRegistration.basePrice),
-          discount: Number(existingRegistration.discount),
-          subtotal: Number(existingRegistration.subtotal),
-          platformFee: Number(existingRegistration.platformFee),
-          total: Number(existingRegistration.total),
-          createdAt: existingRegistration.createdAt,
-          event: existingRegistration.event,
-          modality: existingRegistration.modality,
+          id: activeRegistration.id,
+          registrationNumber: activeRegistration.registrationNumber,
+          status: activeRegistration.status,
+          paymentStatus: activeRegistration.paymentStatus,
+          basePrice: Number(activeRegistration.basePrice),
+          discount: Number(activeRegistration.discount),
+          subtotal: Number(activeRegistration.subtotal),
+          platformFee: Number(activeRegistration.platformFee),
+          total: Number(activeRegistration.total),
+          createdAt: activeRegistration.createdAt,
+          event: activeRegistration.event,
+          modality: activeRegistration.modality,
         },
       },
       { status: 200 }

@@ -50,14 +50,19 @@ export interface PriceCalculation {
  * Resposta do checkout (após criar pagamento no MP)
  */
 export interface CheckoutResponse {
-  registrationId: string;
-  registrationNumber: number;
-  paymentId: string; // ID do Mercado Pago
+  registrationId: string; // ID da primeira inscrição (para compatibilidade)
+  registrationIds: string[]; // IDs de todas as inscrições criadas
+  registrationNumber: number; // Número da primeira inscrição
+  registrationNumbers: number[]; // Números de todas as inscrições
+  paymentId: string; // ID do Mercado Pago (mesmo para todas as inscrições do grupo)
   paymentStatus: 'PENDING';
 
-  // PIX data
-  qrCode: string; // Base64 image
-  qrCodeText: string; // Código PIX copia e cola
+  // PIX data (opcional - apenas se não usar Mercado Pago)
+  qrCode?: string; // Base64 image
+  qrCodeText?: string; // Código PIX copia e cola
+
+  // Mercado Pago checkout URL (se disponível)
+  checkoutUrl?: string; // URL para redirecionar ao Mercado Pago
 
   // Pricing
   pricing: PriceCalculation;

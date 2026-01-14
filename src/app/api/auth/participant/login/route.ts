@@ -17,9 +17,13 @@ export async function POST(request: NextRequest) {
     // Validar dados
     const validatedData = loginSchema.parse(body);
 
-    // Buscar participante
-    const participant = await prisma.participant.findUnique({
-      where: { email: validatedData.email },
+    // Buscar participante por email E que tenha senha (conta ativa na OkeSports)
+    // Email pode repetir para inscrições de terceiros, mas login só funciona com conta que tem senha
+    const participant = await prisma.participant.findFirst({
+      where: { 
+        email: validatedData.email.toLowerCase().trim(),
+        password: { not: null }, // Apenas contas com senha podem fazer login
+      },
       select: {
         id: true,
         email: true,

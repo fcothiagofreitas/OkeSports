@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -49,20 +49,50 @@ export default function DashboardPage() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [mpStatus, setMpStatus] = useState<{ connected: boolean; checking: boolean }>({ connected: false, checking: true });
 
-  useEffect(() => {
-    // Aguardar hidratação do Zustand
-    setIsHydrated(true);
-  }, []);
+  const checkMercadoPagoStatus = useCallback(async () => {
+    if (!accessToken) return;
+    
+    try {
+      setMpStatus({ connected: false, checking: true });
+      const response = await fetch('/api/auth/mercadopago/status', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
 
-  useEffect(() => {
-    // Buscar estatísticas quando autenticado
-    if (isHydrated && user && accessToken) {
-      fetchStats();
+      const data = await response.json();
+      
+      // Atualizar status real
+      setMpStatus({ connected: data.connected === true, checking: false });
+      
+      // Se o status real difere do status no store, atualizar o store
+      if (user && data.connected !== user.mpConnected) {
+        useAuthStore.setState({
+          user: {
+            ...user,
+            mpConnected: data.connected === true,
+            mpUserId: data.userId || null,
+          },
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao verificar status do Mercado Pago:', error);
+      setMpStatus({ connected: false, checking: false });
+      // Se houver erro e o usuário está marcado como conectado, desmarcar
+      if (user && user.mpConnected) {
+        useAuthStore.setState({
+          user: {
+            ...user,
+            mpConnected: false,
+          },
+        });
+      }
     }
-  }, [isHydrated, user, accessToken]);
+  }, [accessToken, user]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       setIsLoadingStats(true);
       const data = await apiGet<DashboardStats>('/api/dashboard/stats');
@@ -83,7 +113,20 @@ export default function DashboardPage() {
     } finally {
       setIsLoadingStats(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    // Aguardar hidratação do Zustand
+    setIsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    // Buscar estatísticas quando autenticado
+    if (isHydrated && user && accessToken) {
+      fetchStats();
+      checkMercadoPagoStatus();
+    }
+  }, [isHydrated, user, accessToken, fetchStats, checkMercadoPagoStatus]);
 
   useEffect(() => {
     // Verificar se está autenticado apenas após hidratação
@@ -106,6 +149,8 @@ export default function DashboardPage() {
           .then((res) => res.json())
           .then((data) => {
             useAuthStore.setState({ user: data.user });
+            // Verificar status real após conectar
+            checkMercadoPagoStatus();
           })
           .catch((err) => console.error('Erro ao atualizar usuário:', err));
 
@@ -168,6 +213,7 @@ export default function DashboardPage() {
             mpUserId: null,
           },
         });
+        setMpStatus({ connected: false, checking: false });
         alert('Mercado Pago desconectado com sucesso!');
       } else {
         const error = await response.json();
@@ -203,13 +249,18 @@ export default function DashboardPage() {
             <CardHeader>
               <CardTitle>Mercado Pago</CardTitle>
               <CardDescription>
-                {user.mpConnected
+                {mpStatus.connected
                   ? 'Sua conta está conectada'
                   : 'Conecte sua conta para receber pagamentos'}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {user.mpConnected ? (
+              {mpStatus.checking ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                  <span className="ml-2 text-sm text-gray-500">Verificando...</span>
+                </div>
+              ) : mpStatus.connected ? (
                 <div className="space-y-3">
                   <div className="flex items-center space-x-2">
                     <div className="h-3 w-3 bg-green-500 rounded-full"></div>

@@ -31,6 +31,8 @@ const eventSchema = z
     state: z.string().length(2, 'Estado deve ter 2 caracteres (ex: SP)'),
     address: z.string().optional(),
     zipCode: z.string().optional(),
+    allowGroupReg: z.boolean().default(true),
+    maxGroupSize: z.number().int().min(1).max(100).default(10).optional(),
   })
   .superRefine((data, ctx) => {
     const eventDate = new Date(data.eventDate);
@@ -74,6 +76,10 @@ export default function NewEventPage() {
     reset,
   } = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
+    defaultValues: {
+      allowGroupReg: true,
+      maxGroupSize: 10,
+    },
   });
 
   // Carregar rascunho do localStorage ao montar
@@ -120,6 +126,8 @@ export default function NewEventPage() {
         registrationStart: regStartISO,
         registrationEnd: regEndISO,
         status: 'DRAFT' as const,
+        allowGroupReg: data.allowGroupReg ?? true,
+        maxGroupSize: data.maxGroupSize ?? 10,
         location: {
           street: data.address || 'Não informado',
           number: 'S/N',
@@ -169,37 +177,37 @@ export default function NewEventPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--gray-100))]">
+    <div className="min-h-screen bg-neutral-off-white">
       <DashboardNav />
 
       {/* Header */}
-      <div className="bg-white border-b border-[hsl(var(--gray-200))]">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10 py-8">
+      <div className="bg-white border-b border-neutral-light-gray">
+        <div className="max-w-[1200px] mx-auto px-4 tablet:px-8 desktop:px-10 py-8">
           <Link
             href="/app/events"
-            className="inline-flex items-center text-sm text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] mb-4 cursor-pointer"
+            className="inline-flex items-center text-sm text-neutral-gray hover:text-neutral-charcoal mb-4 cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar para eventos
           </Link>
-          <h1 className="text-4xl font-bold text-[hsl(var(--dark))] font-sans">Novo Evento</h1>
-          <p className="text-lg text-[hsl(var(--gray-600))] mt-2">
+          <h1 className="text-2xl font-bold text-neutral-charcoal">Novo Evento</h1>
+          <p className="text-lg text-neutral-gray mt-2">
             Siga as etapas para criar seu evento esportivo
           </p>
         </div>
       </div>
 
       {/* Tabs de Navegação - Sticky */}
-      <div className="bg-white border-b border-[hsl(var(--gray-200))] sticky top-0 z-40 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10">
+      <div className="bg-white border-b border-neutral-light-gray sticky top-0 z-40 shadow-card">
+        <div className="max-w-[1200px] mx-auto px-4 tablet:px-8 desktop:px-10">
           <div className="flex gap-1">
             <button
               onClick={() => setActiveTab('info')}
               disabled={true}
               className={`px-6 py-3 font-medium text-sm transition-colors ${
                 activeTab === 'info'
-                  ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
-                  : 'text-[hsl(var(--gray-400))] cursor-not-allowed'
+                  ? 'border-b-2 border-neutral-charcoal text-neutral-charcoal'
+                  : 'text-neutral-gray cursor-not-allowed'
               }`}
             >
               Informações Básicas
@@ -209,23 +217,23 @@ export default function NewEventPage() {
               disabled={!createdEventId}
               className={`px-6 py-3 font-medium text-sm transition-colors ${
                 activeTab === 'modalities'
-                  ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
+                  ? 'border-b-2 border-neutral-charcoal text-neutral-charcoal'
                   : createdEventId
-                  ? 'text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
-                  : 'text-[hsl(var(--gray-400))] cursor-not-allowed'
+                  ? 'text-neutral-gray hover:text-neutral-charcoal hover:bg-neutral-off-white rounded-t-md cursor-pointer'
+                  : 'text-neutral-gray cursor-not-allowed'
               }`}
             >
               Modalidades
             </button>
             <button
               disabled
-              className="px-6 py-3 font-medium text-sm text-[hsl(var(--gray-400))] cursor-not-allowed"
+              className="px-6 py-3 font-medium text-sm text-neutral-gray cursor-not-allowed"
             >
               Lotes
             </button>
             <button
               disabled
-              className="px-6 py-3 font-medium text-sm text-[hsl(var(--gray-400))] cursor-not-allowed"
+              className="px-6 py-3 font-medium text-sm text-neutral-gray cursor-not-allowed"
             >
               Cupons
             </button>
@@ -234,7 +242,7 @@ export default function NewEventPage() {
       </div>
 
       {/* Content */}
-      <main className="max-w-7xl mx-auto px-6 lg:px-10 py-12">
+      <main className="max-w-[1200px] mx-auto px-4 tablet:px-8 desktop:px-10 py-12">
         {/* Etapa 1: Informações Básicas */}
         {activeTab === 'info' && (
           <Card className="p-6">
@@ -287,7 +295,7 @@ export default function NewEventPage() {
 
               {/* Data do Evento */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-[hsl(var(--dark))] flex items-center gap-2">
+                <h3 className="text-lg font-bold text-neutral-charcoal flex items-center gap-2">
                   <Calendar className="h-5 w-5" />
                   Datas
                 </h3>
@@ -335,7 +343,7 @@ export default function NewEventPage() {
 
               {/* Localização */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-[hsl(var(--dark))] flex items-center gap-2">
+                <h3 className="text-lg font-bold text-neutral-charcoal flex items-center gap-2">
                   <MapPin className="h-5 w-5" />
                   Localização
                 </h3>
@@ -386,6 +394,55 @@ export default function NewEventPage() {
                 </div>
               </div>
 
+              {/* Configurações de Inscrição */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-neutral-charcoal">Configurações de Inscrição</h3>
+                
+                <div className="space-y-4 p-4 bg-neutral-off-white rounded-md border border-neutral-light-gray">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="allowGroupReg"
+                      defaultChecked={true}
+                      {...register('allowGroupReg')}
+                      disabled={isLoading}
+                      className="mt-1"
+                    />
+                    <div className="flex-1">
+                      <Label htmlFor="allowGroupReg" className="font-bold cursor-pointer">
+                        Permitir inscrição de terceiros
+                      </Label>
+                      <p className="text-sm text-neutral-gray mt-1">
+                        Permite que participantes inscrevam outras pessoas na mesma compra
+                      </p>
+                    </div>
+                  </div>
+
+                  {watch('allowGroupReg') && (
+                    <div className="space-y-2 ml-7">
+                      <Label htmlFor="maxGroupSize">
+                        Máximo de pessoas por compra
+                      </Label>
+                      <Input
+                        id="maxGroupSize"
+                        type="number"
+                        min="1"
+                        max="100"
+                        defaultValue={10}
+                        {...register('maxGroupSize', {
+                          valueAsNumber: true,
+                        })}
+                        disabled={isLoading}
+                        className="w-32"
+                      />
+                      <p className="text-xs text-neutral-gray">
+                        Limite de participantes que podem ser inscritos em uma única compra (mínimo: 1, máximo: 100)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Ações */}
               <div className="flex gap-4 pt-6">
                 <Link href="/app/events" className="flex-1">
@@ -407,7 +464,7 @@ export default function NewEventPage() {
           <Card className="p-6">
             <ModalityManager eventId={createdEventId} />
 
-            <div className="flex gap-4 pt-6 mt-6 border-t border-[hsl(var(--gray-200))]">
+            <div className="flex gap-4 pt-6 mt-6 border-t border-neutral-light-gray">
               <Button
                 type="button"
                 variant="outline"

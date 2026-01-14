@@ -10,32 +10,50 @@ import { Clock, Loader2 } from 'lucide-react';
 function PendenteContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const registrationId = searchParams.get('id');
-  const [registration, setRegistration] = useState<any>(null);
+  // Suporta tanto 'id' (compatibilidade) quanto 'ids' (múltiplas inscrições)
+  const registrationIdsParam = searchParams.get('ids') || searchParams.get('id');
+  const [registrations, setRegistrations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!registrationId) {
-      router.push('/');
+    if (!registrationIdsParam) {
+      setError('IDs de inscrição não fornecidos');
+      setLoading(false);
       return;
     }
 
-    async function fetchRegistration() {
+    async function fetchRegistrations() {
       try {
-        const response = await fetch(`/api/registrations/${registrationId}`);
-        if (response.ok) {
-          const data = await response.json();
-          setRegistration(data);
+        // Separar IDs (pode ser vírgula ou único)
+        const ids = registrationIdsParam.split(',').filter(Boolean);
+        
+        // Buscar todas as inscrições
+        const registrationPromises = ids.map((id) =>
+          fetch(`/api/registrations/${id.trim()}`).then((res) => {
+            if (res.ok) return res.json();
+            return null;
+          })
+        );
+
+        const results = await Promise.all(registrationPromises);
+        const validRegistrations = results.filter((r) => r !== null);
+
+        if (validRegistrations.length === 0) {
+          setError('Nenhuma inscrição encontrada');
+        } else {
+          setRegistrations(validRegistrations);
         }
       } catch (error) {
-        console.error('Erro ao buscar inscrição:', error);
+        console.error('Erro ao buscar inscrições:', error);
+        setError('Erro ao buscar inscrições');
       } finally {
         setLoading(false);
       }
     }
 
-    fetchRegistration();
-  }, [registrationId, router]);
+    fetchRegistrations();
+  }, [registrationIdsParam]);
 
   if (loading) {
     return (
@@ -44,6 +62,25 @@ function PendenteContent() {
       </div>
     );
   }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[hsl(var(--gray-100))] flex items-center justify-center p-6">
+        <Card className="max-w-2xl w-full">
+          <CardContent className="pt-6">
+            <p className="text-center text-red-600 mb-4">{error}</p>
+            <Link href="/minha-conta" className="block">
+              <Button className="w-full">Ir para Minha Conta</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const totalAmount = registrations.reduce((sum, reg) => {
+    return sum + (Number(reg.pricing?.total ?? reg.total) || 0);
+  }, 0);
 
   return (
     <div className="min-h-screen bg-[hsl(var(--gray-100))] flex items-center justify-center p-6">
@@ -54,33 +91,56 @@ function PendenteContent() {
           </div>
           <CardTitle className="text-3xl text-yellow-600">Pagamento Pendente</CardTitle>
           <CardDescription className="text-base">
-            Estamos aguardando a confirmação do seu pagamento
+            {registrations.length > 1 
+              ? `Estamos aguardando a confirmação do pagamento de ${registrations.length} inscrições`
+              : 'Estamos aguardando a confirmação do seu pagamento'}
           </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {registration && (
-            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg space-y-2">
-              <p className="text-sm text-yellow-900 mb-1">
+          {registrations.length > 0 && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg space-y-4">
+              <p className="text-sm text-yellow-900 mb-2">
                 <strong>⏳ Aguardando confirmação</strong>
               </p>
-              <p className="text-sm text-yellow-800">
-                <span className="font-medium">Número da inscrição:</span> #{registration.registrationNumber}
-              </p>
-              <p className="text-sm text-yellow-800">
-                <span className="font-medium">Evento:</span> {registration.event?.name}
-              </p>
-              <p className="text-sm text-yellow-800">
-                <span className="font-medium">Modalidade:</span> {registration.modality?.name}
-              </p>
-              <p className="text-sm text-yellow-800">
-                <span className="font-medium">Total:</span>{' '}
-                {new Intl.NumberFormat('pt-BR', {
-                  style: 'currency',
-                  currency: 'BRL',
-                }).format(registration.pricing?.total ?? registration.total)}
-              </p>
-              <p className="text-sm text-yellow-800 mt-2">
+              
+              {registrations.length > 1 && (
+                <div className="mb-4">
+                  <p className="text-sm font-medium text-yellow-900 mb-2">
+                    {registrations.length} inscrições criadas:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-yellow-800">
+                    {registrations.map((reg, index) => (
+                      <li key={reg.id}>
+                        #{reg.registrationNumber} - {reg.participant?.fullName || 'Participante'}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <p className="text-sm text-yellow-800">
+                  <span className="font-medium">Evento:</span> {registrations[0]?.event?.name}
+                </p>
+                <p className="text-sm text-yellow-800">
+                  <span className="font-medium">Modalidade:</span> {registrations[0]?.modality?.name}
+                </p>
+                {registrations.length === 1 && (
+                  <p className="text-sm text-yellow-800">
+                    <span className="font-medium">Número da inscrição:</span> #{registrations[0].registrationNumber}
+                  </p>
+                )}
+                <p className="text-sm text-yellow-800">
+                  <span className="font-medium">Total:</span>{' '}
+                  {new Intl.NumberFormat('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                  }).format(totalAmount)}
+                </p>
+              </div>
+
+              <p className="text-sm text-yellow-800 mt-3 pt-3 border-t border-yellow-300">
                 Se você pagou via PIX, a confirmação costuma ser quase imediata.
                 Para boleto, a compensação pode levar até 3 dias úteis.
               </p>
@@ -101,9 +161,9 @@ function PendenteContent() {
                 Acompanhar Status
               </Button>
             </Link>
-            <Link href="/" className="block">
+            <Link href="/minha-conta" className="block">
               <Button variant="outline" className="w-full">
-                Voltar para Home
+                Voltar para Minha Conta
               </Button>
             </Link>
           </div>

@@ -69,12 +69,12 @@ model Address {
 model Participant {
   // Identificação
   id       String  @id @default(cuid())
-  email    String  @unique
+  email    String  // Não é único - pode haver múltiplos participantes com mesmo email (família, etc)
   password String? // null se criado por terceiro
 
   // Dados Pessoais
   fullName  String
-  cpf       String   @unique
+  cpf       String   @unique // CPF é único - cada pessoa só pode ter uma conta
   phone     String
   birthDate DateTime
   gender    Gender   @default(NOT_INFORMED)

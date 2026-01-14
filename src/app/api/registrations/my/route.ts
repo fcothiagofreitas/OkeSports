@@ -25,12 +25,33 @@ export async function GET(request: NextRequest) {
 
     const participantId = decoded.userId;
 
-    // Buscar inscrições do participante
+    // Buscar inscrições onde o participante é o inscrito OU o comprador
+    // Isso permite ver todas as inscrições que o usuário fez (incluindo para outras pessoas)
     const registrations = await prisma.registration.findMany({
       where: {
-        participantId,
+        OR: [
+          { participantId }, // Inscrições onde o usuário é o participante
+          { buyerId: participantId }, // Inscrições onde o usuário é o comprador
+        ],
       },
-      include: {
+      select: {
+        id: true,
+        registrationNumber: true,
+        status: true,
+        paymentStatus: true,
+        total: true,
+        createdAt: true,
+        shirtSize: true,
+        buyerId: true,
+        paymentId: true,
+        eventId: true,
+        participantId: true,
+        participant: {
+          select: {
+            fullName: true,
+            cpf: true,
+          },
+        },
         event: {
           select: {
             name: true,
