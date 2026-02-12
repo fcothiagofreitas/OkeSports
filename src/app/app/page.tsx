@@ -28,6 +28,7 @@ interface DashboardStats {
     total: number;
     platformFee: number;
     net: number;
+    mercadoPagoFee?: number;
   };
   upcomingEvent: {
     id: string;
@@ -49,11 +50,14 @@ export default function DashboardPage() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
-  const [mpStatus, setMpStatus] = useState<{ connected: boolean; checking: boolean }>({ connected: false, checking: true });
+  const [mpStatus, setMpStatus] = useState<{ connected: boolean; checking: boolean }>({
+    connected: false,
+    checking: true,
+  });
 
   const checkMercadoPagoStatus = useCallback(async () => {
     if (!accessToken) return;
-    
+
     try {
       setMpStatus({ connected: false, checking: true });
       const response = await fetch('/api/auth/mercadopago/status', {
@@ -63,17 +67,16 @@ export default function DashboardPage() {
       });
 
       const data = await response.json();
-      
+
       // Atualizar status real
       setMpStatus({ connected: data.connected === true, checking: false });
-      
+
       // Se o status real difere do status no store, atualizar o store
       if (user && data.connected !== user.mpConnected) {
         useAuthStore.setState({
           user: {
             ...user,
             mpConnected: data.connected === true,
-            mpUserId: data.userId || null,
           },
         });
       }
@@ -210,7 +213,6 @@ export default function DashboardPage() {
           user: {
             ...user!,
             mpConnected: false,
-            mpUserId: null,
           },
         });
         setMpStatus({ connected: false, checking: false });
@@ -236,16 +238,22 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[hsl(var(--gray-100))]">
       <DashboardNav />
 
-      {/* Main Content com espaçamento Dribbble */}
-      <main className="max-w-7xl mx-auto px-6 lg:px-10 py-12">
-        <div className="mb-12">
-          <h2 className="text-4xl font-bold text-[hsl(var(--dark))] mb-2 font-sans">Dashboard</h2>
-          <p className="text-lg text-[hsl(var(--gray-600))]">Bem-vindo, {user.fullName}!</p>
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-12">
+        <div className="mb-10 space-y-3 sm:mb-12">
+          <Badge variant="outline" className="rounded-full px-3 py-1 text-xs tracking-wide">
+            Painel de gestão
+          </Badge>
+          <h2 className="text-3xl font-bold text-[hsl(var(--dark))] sm:text-4xl font-sans">
+            Dashboard
+          </h2>
+          <p className="max-w-2xl text-base text-[hsl(var(--gray-700))] sm:text-lg">
+            Bem-vindo, {user.fullName}! Confira seus eventos, pagamentos e indicadores em um só
+            lugar.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Card: Mercado Pago */}
-          <Card>
+        <section className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+          <Card className="flex h-full flex-col">
             <CardHeader>
               <CardTitle>Mercado Pago</CardTitle>
               <CardDescription>
@@ -254,11 +262,11 @@ export default function DashboardPage() {
                   : 'Conecte sua conta para receber pagamentos'}
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="mt-auto">
               {mpStatus.checking ? (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                  <span className="ml-2 text-sm text-gray-500">Verificando...</span>
+                  <span className="ml-2 text-sm text-[hsl(var(--gray-700))]">Verificando...</span>
                 </div>
               ) : mpStatus.connected ? (
                 <div className="space-y-3">
@@ -283,13 +291,12 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Card: Eventos */}
-          <Card>
+          <Card className="flex h-full flex-col">
             <CardHeader>
               <CardTitle>Meus Eventos</CardTitle>
               <CardDescription>Gerencie seus eventos esportivos</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="mt-auto">
               <Link href="/app/events">
                 <Button variant="outline" className="w-full">
                   Ver Eventos
@@ -298,162 +305,182 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Card: Inscrições */}
-          <Card>
+          <Card className="flex h-full flex-col">
             <CardHeader>
               <CardTitle>Inscrições</CardTitle>
               <CardDescription>Acompanhe as inscrições dos seus eventos</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="mt-auto">
               <Button variant="outline" className="w-full" disabled>
                 Ver Inscrições (Em breve)
               </Button>
             </CardContent>
           </Card>
-        </div>
+        </section>
 
-        {/* Alertas */}
-        {stats && stats.alerts.length > 0 && (
-          <div className="mt-8 space-y-3">
-            {stats.alerts.map((alert, index) => {
-              const Icon =
-                alert.type === 'warning'
-                  ? AlertTriangle
-                  : alert.type === 'error'
+        <section className="mt-10 sm:mt-12">
+          <div className="mb-4 flex items-end justify-between gap-4">
+            <h3 className="text-xl font-semibold text-[hsl(var(--dark))] font-sans">
+              Indicadores rápidos
+            </h3>
+            <span className="text-xs text-[hsl(var(--gray-700))]">Atualização automática</span>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="min-h-[108px] text-center">
+                  {isLoadingStats ? (
+                    <Loader2 className="mx-auto h-8 w-8 animate-spin text-[hsl(var(--accent-pink))]" />
+                  ) : (
+                    <>
+                      <p className="text-3xl font-bold text-[hsl(var(--dark))] tabular-nums">
+                        {stats?.events.active ?? 0}
+                      </p>
+                      <p className="mt-1 text-sm text-[hsl(var(--gray-700))]">Eventos Ativos</p>
+                      <p className="mt-1 text-xs text-[hsl(var(--gray-700))]">
+                        {stats?.events.total ?? 0} total • {stats?.events.draft ?? 0} rascunhos
+                      </p>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-6">
+                <div className="min-h-[108px] text-center">
+                  {isLoadingStats ? (
+                    <Loader2 className="mx-auto h-8 w-8 animate-spin text-[hsl(var(--accent-pink))]" />
+                  ) : (
+                    <>
+                      <p className="text-3xl font-bold text-[hsl(var(--dark))] tabular-nums">
+                        {stats?.registrations.total ?? 0}
+                      </p>
+                      <p className="mt-1 text-sm text-[hsl(var(--gray-700))]">Inscrições</p>
+                      <p className="mt-1 text-xs text-[hsl(var(--gray-700))]">
+                        {stats?.registrations.confirmed ?? 0} confirmadas •{' '}
+                        {stats?.registrations.pending ?? 0} pendentes
+                      </p>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-6">
+                <div className="min-h-[108px] text-center">
+                  {isLoadingStats ? (
+                    <Loader2 className="mx-auto h-8 w-8 animate-spin text-[hsl(var(--accent-pink))]" />
+                  ) : (
+                    <>
+                      <p className="text-3xl font-bold text-[hsl(var(--accent-pink))] tabular-nums">
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        }).format(stats?.revenue.net ?? 0)}
+                      </p>
+                      <p className="mt-1 text-sm text-[hsl(var(--gray-700))]">Receita Líquida</p>
+                      <p className="mt-1 text-xs text-[hsl(var(--gray-700))]">
+                        Bruta:{' '}
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        }).format(stats?.revenue.total ?? 0)}
+                      </p>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-6">
+                <div className="min-h-[108px] text-center">
+                  {isLoadingStats ? (
+                    <Loader2 className="mx-auto h-8 w-8 animate-spin text-[hsl(var(--accent-pink))]" />
+                  ) : (
+                    <>
+                      <p className="text-3xl font-bold text-[hsl(var(--gray-800))] tabular-nums">
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        }).format(stats?.revenue.mercadoPagoFee ?? stats?.revenue.platformFee ?? 0)}
+                      </p>
+                      <p className="mt-1 text-sm text-[hsl(var(--gray-700))]">Taxa Mercado Pago</p>
+                      <p className="mt-1 text-xs text-[hsl(var(--gray-700))]">
+                        {stats?.registrations.recent ?? 0} inscrições nos últimos 7 dias
+                      </p>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <section className="mt-10 sm:mt-12">
+          <div className="mb-4">
+            <h3 className="text-xl font-semibold text-[hsl(var(--dark))] font-sans">Alertas</h3>
+            <p className="text-sm text-[hsl(var(--gray-700))]">
+              Avisos importantes para acompanhamento da operação.
+            </p>
+          </div>
+          {stats && stats.alerts.length > 0 ? (
+            <div className="space-y-3">
+              {stats.alerts.map((alert, index) => {
+                const Icon =
+                  alert.type === 'warning'
                     ? AlertTriangle
-                    : alert.type === 'success'
-                      ? CheckCircle
-                      : Info;
-              const bgColor =
-                alert.type === 'warning'
-                  ? 'bg-amber-50 border-amber-200'
-                  : alert.type === 'error'
-                    ? 'bg-red-50 border-red-200'
-                    : alert.type === 'success'
-                      ? 'bg-emerald-50 border-emerald-200'
-                      : 'bg-blue-50 border-blue-200';
-              const textColor =
-                alert.type === 'warning'
-                  ? 'text-amber-800'
-                  : alert.type === 'error'
-                    ? 'text-red-800'
-                    : alert.type === 'success'
-                      ? 'text-emerald-800'
-                      : 'text-blue-800';
+                    : alert.type === 'error'
+                      ? AlertTriangle
+                      : alert.type === 'success'
+                        ? CheckCircle
+                        : Info;
+                const bgColor =
+                  alert.type === 'warning'
+                    ? 'bg-amber-50 border-amber-200'
+                    : alert.type === 'error'
+                      ? 'bg-red-50 border-red-200'
+                      : alert.type === 'success'
+                        ? 'bg-emerald-50 border-emerald-200'
+                        : 'bg-blue-50 border-blue-200';
+                const textColor =
+                  alert.type === 'warning'
+                    ? 'text-amber-800'
+                    : alert.type === 'error'
+                      ? 'text-red-800'
+                      : alert.type === 'success'
+                        ? 'text-emerald-800'
+                        : 'text-blue-800';
 
-              return (
-                <div key={index} className={`rounded-xl border p-4 ${bgColor} ${textColor}`}>
-                  <div className="flex items-start gap-3">
-                    <Icon className="h-5 w-5 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{alert.message}</p>
-                      {alert.action && (
-                        <Link href={alert.action.href} className="mt-2 inline-block">
-                          <Button variant="outline" size="sm" className="text-xs">
-                            {alert.action.label}
-                          </Button>
-                        </Link>
-                      )}
+                return (
+                  <div key={index} className={`rounded-xl border p-4 ${bgColor} ${textColor}`}>
+                    <div className="flex items-start gap-3">
+                      <Icon className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{alert.message}</p>
+                        {alert.action && (
+                          <Link href={alert.action.href} className="mt-2 inline-block">
+                            <Button variant="outline" size="sm" className="text-xs">
+                              {alert.action.label}
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Quick Stats */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                {isLoadingStats ? (
-                  <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--accent-pink))] mx-auto" />
-                ) : (
-                  <>
-                    <p className="text-3xl font-bold text-[hsl(var(--dark))]">
-                      {stats?.events.active ?? 0}
-                    </p>
-                    <p className="text-sm text-gray-600 mt-1">Eventos Ativos</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {stats?.events.total ?? 0} total • {stats?.events.draft ?? 0} rascunhos
-                    </p>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                {isLoadingStats ? (
-                  <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--accent-pink))] mx-auto" />
-                ) : (
-                  <>
-                    <p className="text-3xl font-bold text-[hsl(var(--dark))]">
-                      {stats?.registrations.total ?? 0}
-                    </p>
-                    <p className="text-sm text-gray-600 mt-1">Inscrições</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {stats?.registrations.confirmed ?? 0} confirmadas •{' '}
-                      {stats?.registrations.pending ?? 0} pendentes
-                    </p>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                {isLoadingStats ? (
-                  <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--accent-pink))] mx-auto" />
-                ) : (
-                  <>
-                    <p className="text-3xl font-bold text-[hsl(var(--accent-pink))]">
-                      {new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                      }).format(stats?.revenue.net ?? 0)}
-                    </p>
-                    <p className="text-sm text-gray-600 mt-1">Receita Líquida</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Bruta: {new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                      }).format(stats?.revenue.total ?? 0)}
-                    </p>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center">
-                {isLoadingStats ? (
-                  <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--accent-pink))] mx-auto" />
-                ) : (
-                  <>
-                    <p className="text-3xl font-bold text-[hsl(var(--gray-600))]">
-                      {new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                      }).format(stats?.revenue.mercadoPagoFee ?? 0)}
-                    </p>
-                    <p className="text-sm text-gray-600 mt-1">Taxa Mercado Pago</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {stats?.registrations.recent ?? 0} inscrições nos últimos 7 dias
-                    </p>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                );
+              })}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="py-6">
+                <p className="text-sm text-[hsl(var(--gray-700))]">Nenhum alerta no momento.</p>
+              </CardContent>
+            </Card>
+          )}
+        </section>
       </main>
     </div>
   );

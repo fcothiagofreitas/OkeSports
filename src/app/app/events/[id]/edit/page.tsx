@@ -119,7 +119,15 @@ interface LandingFaqItem {
   answer: string;
 }
 
-type TabType = 'overview' | 'info' | 'landing' | 'modalities' | 'batches' | 'coupons' | 'kit' | 'registrations';
+type TabType =
+  | 'overview'
+  | 'info'
+  | 'landing'
+  | 'modalities'
+  | 'batches'
+  | 'coupons'
+  | 'kit'
+  | 'registrations';
 
 export default function EditEventPage() {
   const router = useRouter();
@@ -181,7 +189,11 @@ export default function EditEventPage() {
       const points = Array.isArray(data.landingSellingPoints)
         ? (data.landingSellingPoints as LandingSellingPoint[])
         : [];
-      const placeholders = Array.from({ length: 3 }, () => ({ title: '', description: '', icon: '' }));
+      const placeholders = Array.from({ length: 3 }, () => ({
+        title: '',
+        description: '',
+        icon: '',
+      }));
       const normalizedPoints = [...points, ...placeholders].slice(0, 3);
       setSellingPoints(normalizedPoints);
       setAboutDescription(data.landingAbout?.description || '');
@@ -392,8 +404,13 @@ export default function EditEventPage() {
       console.error('Erro ao salvar landing:', error);
       if (error instanceof ApiError) {
         const detailMessage =
-          error.data?.details?.[0]?.message || (typeof error.data?.error === 'string' ? error.data.error : null);
-        alert(detailMessage ? `Erro ao salvar landing: ${detailMessage}` : 'Dados inválidos ao salvar landing.');
+          error.data?.details?.[0]?.message ||
+          (typeof error.data?.error === 'string' ? error.data.error : null);
+        alert(
+          detailMessage
+            ? `Erro ao salvar landing: ${detailMessage}`
+            : 'Dados inválidos ao salvar landing.'
+        );
       } else {
         alert('Erro ao salvar landing. Tente novamente.');
       }
@@ -405,7 +422,7 @@ export default function EditEventPage() {
   if (isFetching) {
     return (
       <div className="min-h-screen bg-[hsl(var(--gray-100))] flex items-center justify-center">
-        <p className="text-[hsl(var(--gray-600))]">Carregando evento...</p>
+        <p className="text-[hsl(var(--gray-700))]">Carregando evento...</p>
       </div>
     );
   }
@@ -430,21 +447,21 @@ export default function EditEventPage() {
       <DashboardNav />
 
       {/* Header */}
-      <div className="bg-white border-[hsl(var(--gray-200))]">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10 py-8">
+      <div className="border-b border-[hsl(var(--gray-200))] bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
           <Link
             href="/app/events"
-            className="inline-flex items-center text-sm text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] mb-4 cursor-pointer"
+            className="mb-4 inline-flex items-center text-sm text-[hsl(var(--gray-700))] hover:text-[hsl(var(--dark))] cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar para eventos
           </Link>
-          <div className="flex justify-between items-start">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-4xl font-bold text-[hsl(var(--dark))] font-sans">
+              <h1 className="text-3xl font-bold text-[hsl(var(--dark))] sm:text-4xl font-sans">
                 {event?.name}
               </h1>
-              <p className="text-lg text-[hsl(var(--gray-600))] mt-2">Editar Evento</p>
+              <p className="mt-2 text-base text-[hsl(var(--gray-700))] sm:text-lg">Editar Evento</p>
             </div>
             <div className="flex gap-3 items-center">
               {getStatusBadge(event?.status || 'DRAFT')}
@@ -458,11 +475,11 @@ export default function EditEventPage() {
 
           {/* Stats */}
           <div className="flex gap-6 mt-6">
-            <div className="flex items-center gap-2 text-sm text-[hsl(var(--gray-600))]">
+            <div className="flex items-center gap-2 text-sm text-[hsl(var(--gray-700))]">
               <Calendar className="h-4 w-4" />
               {event?.eventDate && new Date(event.eventDate).toLocaleDateString('pt-BR')}
             </div>
-            <div className="flex items-center gap-2 text-sm text-[hsl(var(--gray-600))]">
+            <div className="flex items-center gap-2 text-sm text-[hsl(var(--gray-700))]">
               <Users className="h-4 w-4" />
               {event?._count.registrations} inscrições • {event?._count.modalities} modalidades
             </div>
@@ -476,26 +493,16 @@ export default function EditEventPage() {
                   <p className="text-sm font-medium text-[hsl(var(--dark))] mb-1">
                     Link Público do Evento
                   </p>
-                  <code className="text-sm text-[hsl(var(--gray-600))] break-all">
+                  <code className="text-sm text-[hsl(var(--gray-700))] break-all">
                     {typeof window !== 'undefined' && `${window.location.origin}/e/${event.slug}`}
                   </code>
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={copyPublicLink}
-                    className="gap-2"
-                  >
+                  <Button variant="outline" size="sm" onClick={copyPublicLink} className="gap-2">
                     {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     {copied ? 'Copiado!' : 'Copiar'}
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={openPublicPage}
-                    className="gap-2"
-                  >
+                  <Button variant="outline" size="sm" onClick={openPublicPage} className="gap-2">
                     <ExternalLink className="h-4 w-4" />
                     Abrir
                   </Button>
@@ -507,15 +514,15 @@ export default function EditEventPage() {
       </div>
 
       {/* Tabs de Navegação - Sticky */}
-      <div className="bg-white border-b sticky top-0 z-40 ">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10">
-          <div className="flex gap-1">
+      <div className="sticky top-0 z-40 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-10">
+          <div className="flex gap-1 overflow-x-auto py-1">
             <button
               onClick={() => setActiveTab('overview')}
               className={`px-6 py-3 font-medium text-sm transition-colors ${
                 activeTab === 'overview'
                   ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
-                  : 'text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
+                  : 'text-[hsl(var(--gray-700))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
               }`}
             >
               Geral
@@ -525,7 +532,7 @@ export default function EditEventPage() {
               className={`px-6 py-3 font-medium text-sm transition-colors ${
                 activeTab === 'info'
                   ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
-                  : 'text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
+                  : 'text-[hsl(var(--gray-700))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
               }`}
             >
               Informações Básicas
@@ -535,7 +542,7 @@ export default function EditEventPage() {
               className={`px-6 py-3 font-medium text-sm transition-colors ${
                 activeTab === 'landing'
                   ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
-                  : 'text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
+                  : 'text-[hsl(var(--gray-700))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
               }`}
             >
               Landing
@@ -545,7 +552,7 @@ export default function EditEventPage() {
               className={`px-6 py-3 font-medium text-sm transition-colors ${
                 activeTab === 'modalities'
                   ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
-                  : 'text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
+                  : 'text-[hsl(var(--gray-700))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
               }`}
             >
               Modalidades ({event?._count.modalities || 0})
@@ -555,7 +562,7 @@ export default function EditEventPage() {
               className={`px-6 py-3 font-medium text-sm transition-colors ${
                 activeTab === 'batches'
                   ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
-                  : 'text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
+                  : 'text-[hsl(var(--gray-700))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
               }`}
             >
               Lotes
@@ -565,7 +572,7 @@ export default function EditEventPage() {
               className={`px-6 py-3 font-medium text-sm transition-colors ${
                 activeTab === 'coupons'
                   ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
-                  : 'text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
+                  : 'text-[hsl(var(--gray-700))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
               }`}
             >
               Cupons
@@ -575,7 +582,7 @@ export default function EditEventPage() {
               className={`px-6 py-3 font-medium text-sm transition-colors ${
                 activeTab === 'kit'
                   ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
-                  : 'text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
+                  : 'text-[hsl(var(--gray-700))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
               }`}
             >
               Kit
@@ -585,7 +592,7 @@ export default function EditEventPage() {
               className={`px-6 py-3 font-medium text-sm transition-colors ${
                 activeTab === 'registrations'
                   ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
-                  : 'text-[hsl(var(--gray-600))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
+                  : 'text-[hsl(var(--gray-700))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] rounded-t-lg cursor-pointer'
               }`}
             >
               Inscritos ({event?._count.registrations || 0})
@@ -595,30 +602,36 @@ export default function EditEventPage() {
       </div>
 
       {/* Content */}
-      <main className="max-w-7xl mx-auto px-6 lg:px-10 py-12">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-12">
         {/* Tab: Geral/Overview */}
         {activeTab === 'overview' && event && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card>
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+              <Card className="border-[hsl(var(--gray-300))] shadow-sm">
                 <CardContent className="pt-6">
-                  <p className="text-xs uppercase tracking-wide text-[hsl(var(--gray-500))]">Inscrições confirmadas</p>
+                  <p className="text-xs uppercase tracking-wide text-[hsl(var(--gray-700))]">
+                    Inscrições confirmadas
+                  </p>
                   <p className="text-3xl font-bold text-[hsl(var(--dark))] mt-2">
                     {event._count?.registrations ?? 0}
                   </p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="border-[hsl(var(--gray-300))] shadow-sm">
                 <CardContent className="pt-6">
-                  <p className="text-xs uppercase tracking-wide text-[hsl(var(--gray-500))]">Modalidades</p>
+                  <p className="text-xs uppercase tracking-wide text-[hsl(var(--gray-700))]">
+                    Modalidades
+                  </p>
                   <p className="text-3xl font-bold text-[hsl(var(--dark))] mt-2">
                     {event._count?.modalities ?? 0}
                   </p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="border-[hsl(var(--gray-300))] shadow-sm">
                 <CardContent className="pt-6 space-y-2">
-                  <p className="text-xs uppercase tracking-wide text-[hsl(var(--gray-500))]">Ações rápidas</p>
+                  <p className="text-xs uppercase tracking-wide text-[hsl(var(--gray-700))]">
+                    Ações rápidas
+                  </p>
                   <div className="flex flex-col gap-2">
                     <Button
                       variant="outline"
@@ -649,17 +662,23 @@ export default function EditEventPage() {
 
         {/* Tab: Informações Básicas */}
         {activeTab === 'info' && (
-          <Card>
+          <Card className="border-[hsl(var(--gray-300))] shadow-sm">
             <CardHeader>
               <CardTitle>Informações Básicas</CardTitle>
-              <CardDescription>Edite os dados principais do seu evento</CardDescription>
+              <CardDescription className="text-[hsl(var(--gray-700))]">
+                Edite os dados principais do seu evento
+              </CardDescription>
             </CardHeader>
             <CardContent>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                  {error && (
-                    <div className="rounded-md bg-red-50 p-4 text-sm text-red-800">{error}</div>
-                  )}
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+                {error && (
+                  <div className="rounded-md bg-red-50 p-4 text-sm text-red-800">{error}</div>
+                )}
 
+                <div className="space-y-6 rounded-xl border border-[hsl(var(--gray-200))] bg-[hsl(var(--gray-50))] p-4 sm:p-5">
+                  <h3 className="text-base font-semibold text-[hsl(var(--dark))]">
+                    Dados principais
+                  </h3>
                   {/* Nome do Evento */}
                   <div className="space-y-2">
                     <Label htmlFor="name">Nome do Evento *</Label>
@@ -674,7 +693,7 @@ export default function EditEventPage() {
                       id="status"
                       {...register('status')}
                       disabled={isLoading}
-                      className="flex h-11 w-full rounded-full border border-input bg-background px-6 py-3 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-11 w-full appearance-none rounded-xl border border-[hsl(var(--gray-300))] bg-white px-4 py-2 text-sm text-[hsl(var(--dark))] shadow-sm transition-colors hover:border-[hsl(var(--gray-400))] focus-visible:border-[hsl(var(--dark))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--gray-300))] disabled:cursor-not-allowed disabled:border-[hsl(var(--gray-200))] disabled:bg-[hsl(var(--gray-100))] disabled:text-[hsl(var(--gray-600))]"
                     >
                       <option value="DRAFT">Rascunho</option>
                       <option value="PUBLISHED">Publicado</option>
@@ -684,8 +703,11 @@ export default function EditEventPage() {
                       <p className="text-sm text-red-600">{errors.status.message}</p>
                     )}
                   </div>
+                </div>
 
-                  {/* Descrição */}
+                {/* Descrição */}
+                <div className="space-y-4 rounded-xl border border-[hsl(var(--gray-200))] bg-[hsl(var(--gray-50))] p-4 sm:p-5">
+                  <h3 className="text-base font-semibold text-[hsl(var(--dark))]">Descrição</h3>
                   <div className="space-y-2">
                     <Label htmlFor="description">Descrição Completa *</Label>
                     <Textarea
@@ -698,10 +720,13 @@ export default function EditEventPage() {
                       <p className="text-sm text-red-600">{errors.description.message}</p>
                     )}
                   </div>
+                </div>
 
-                  {/* Datas */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
+                {/* Datas */}
+                <div className="space-y-4 rounded-xl border border-[hsl(var(--gray-200))] bg-[hsl(var(--gray-50))] p-4 sm:p-5">
+                  <h3 className="text-base font-semibold text-[hsl(var(--dark))]">Datas</h3>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
+                    <div className="space-y-2 md:col-span-4">
                       <Label htmlFor="eventDate">Data do Evento *</Label>
                       <Input
                         id="eventDate"
@@ -714,7 +739,7 @@ export default function EditEventPage() {
                       )}
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2 md:col-span-4">
                       <Label htmlFor="registrationStart">Início Inscrições *</Label>
                       <Input
                         id="registrationStart"
@@ -727,7 +752,7 @@ export default function EditEventPage() {
                       )}
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-2 md:col-span-4">
                       <Label htmlFor="registrationEnd">Fim Inscrições *</Label>
                       <Input
                         id="registrationEnd"
@@ -740,118 +765,117 @@ export default function EditEventPage() {
                       )}
                     </div>
                   </div>
+                </div>
 
-                  {/* Localização */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-[hsl(var(--dark))]">Localização</h3>
+                {/* Localização */}
+                <div className="space-y-4 rounded-xl border border-[hsl(var(--gray-200))] bg-[hsl(var(--gray-50))] p-4 sm:p-5">
+                  <h3 className="text-base font-semibold text-[hsl(var(--dark))]">Localização</h3>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="zipCode">CEP</Label>
-                      <Input
-                        id="zipCode"
-                        placeholder="00000-000"
-                        {...register('zipCode')}
-                        onBlur={handleCepBlur}
-                        disabled={isLoading}
-                      />
-                      {cepLoading && (
-                        <p className="text-sm text-[hsl(var(--gray-600))]">Buscando endereço...</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="zipCode">CEP</Label>
+                    <Input
+                      id="zipCode"
+                      placeholder="00000-000"
+                      {...register('zipCode')}
+                      onBlur={handleCepBlur}
+                      disabled={isLoading}
+                    />
+                    {cepLoading && (
+                      <p className="text-sm text-[hsl(var(--gray-700))]">Buscando endereço...</p>
+                    )}
+                    {cepError && <p className="text-sm text-red-600">{cepError}</p>}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Endereço (logradouro)</Label>
+                    <Input id="address" {...register('address')} disabled={isLoading} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="neighborhood">Bairro</Label>
+                    <Input
+                      id="neighborhood"
+                      placeholder="Bairro"
+                      {...register('neighborhood')}
+                      disabled={isLoading}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
+                    <div className="space-y-2 md:col-span-8">
+                      <Label htmlFor="city">Cidade *</Label>
+                      <Input id="city" {...register('city')} disabled={isLoading} />
+                      {errors.city && <p className="text-sm text-red-600">{errors.city.message}</p>}
+                    </div>
+
+                    <div className="space-y-2 md:col-span-4">
+                      <Label htmlFor="state">Estado (UF) *</Label>
+                      <Input id="state" maxLength={2} {...register('state')} disabled={isLoading} />
+                      {errors.state && (
+                        <p className="text-sm text-red-600">{errors.state.message}</p>
                       )}
-                      {cepError && <p className="text-sm text-red-600">{cepError}</p>}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="address">Endereço (logradouro)</Label>
-                      <Input id="address" {...register('address')} disabled={isLoading} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="neighborhood">Bairro</Label>
-                      <Input
-                        id="neighborhood"
-                        placeholder="Bairro"
-                        {...register('neighborhood')}
-                        disabled={isLoading}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="city">Cidade *</Label>
-                        <Input id="city" {...register('city')} disabled={isLoading} />
-                        {errors.city && (
-                          <p className="text-sm text-red-600">{errors.city.message}</p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="state">Estado (UF) *</Label>
-                        <Input
-                          id="state"
-                          maxLength={2}
-                          {...register('state')}
-                          disabled={isLoading}
-                        />
-                        {errors.state && (
-                          <p className="text-sm text-red-600">{errors.state.message}</p>
-                        )}
-                      </div>
                     </div>
                   </div>
+                </div>
 
-                  {/* Ações */}
-                  <div className="flex gap-4 pt-6">
-                    <Button type="submit" disabled={isLoading} className="flex-1">
-                      {isLoading ? 'Salvando...' : 'Salvar Alterações'}
-                    </Button>
-                  </div>
-                </form>
+                {/* Ações */}
+                <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:pt-4">
+                  <Button type="submit" disabled={isLoading} className="w-full sm:flex-1">
+                    {isLoading ? 'Salvando...' : 'Salvar Alterações'}
+                  </Button>
+                </div>
+              </form>
             </CardContent>
           </Card>
         )}
 
         {activeTab === 'landing' && (
-          <Card className="p-6 space-y-8">
-            <div className="space-y-4">
+          <Card className="space-y-8 border-[hsl(var(--gray-300))] p-4 shadow-sm sm:p-6">
+            <section className="space-y-4 rounded-xl border border-[hsl(var(--gray-200))] bg-[hsl(var(--gray-50))] p-4 sm:p-5">
               <h3 className="text-xl font-semibold text-[hsl(var(--dark))]">Destaques (Hero)</h3>
-              <p className="text-sm text-[hsl(var(--gray-600))]">
+              <p className="text-sm text-[hsl(var(--gray-700))]">
                 Esses cards aparecem no topo da landing. Preencha até três itens.
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 {sellingPoints.map((point, index) => {
                   return (
-                    <div key={index} className="border border-[hsl(var(--gray-200))] rounded-xl p-4 space-y-3">
-                    <p className="text-sm font-semibold text-[hsl(var(--gray-600))]">Destaque {index + 1}</p>
-                    <div className="space-y-2">
-                      <Label>Título</Label>
-                      <Input
-                        value={point.title || ''}
-                        onChange={(e) => updateSellingPoint(index, 'title', e.target.value)}
-                      />
+                    <div
+                      key={index}
+                      className="border border-[hsl(var(--gray-200))] rounded-xl p-4 space-y-3"
+                    >
+                      <p className="text-sm font-semibold text-[hsl(var(--gray-700))]">
+                        Destaque {index + 1}
+                      </p>
+                      <div className="space-y-2">
+                        <Label>Título</Label>
+                        <Input
+                          value={point.title || ''}
+                          onChange={(e) => updateSellingPoint(index, 'title', e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Descrição</Label>
+                        <Textarea
+                          value={point.description || ''}
+                          onChange={(e) => updateSellingPoint(index, 'description', e.target.value)}
+                          rows={3}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Ícone (opcional)</Label>
+                        <IconSelector
+                          value={point.icon || undefined}
+                          onChange={(iconKey) => updateSellingPoint(index, 'icon', iconKey)}
+                          onClear={() => updateSellingPoint(index, 'icon', '')}
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Descrição</Label>
-                      <Textarea
-                        value={point.description || ''}
-                        onChange={(e) => updateSellingPoint(index, 'description', e.target.value)}
-                        rows={3}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Ícone (opcional)</Label>
-                      <IconSelector
-                        value={point.icon || undefined}
-                        onChange={(iconKey) => updateSellingPoint(index, 'icon', iconKey)}
-                        onClear={() => updateSellingPoint(index, 'icon', '')}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
               </div>
-            </div>
+            </section>
 
-            <div className="space-y-4">
+            <section className="space-y-4 rounded-xl border border-[hsl(var(--gray-200))] bg-[hsl(var(--gray-50))] p-4 sm:p-5">
               <h3 className="text-xl font-semibold text-[hsl(var(--dark))]">Sobre o evento</h3>
               <div className="space-y-2">
                 <Label>Descrição</Label>
@@ -862,7 +886,7 @@ export default function EditEventPage() {
                   placeholder="Texto principal sobre o evento..."
                 />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Inclui (uma linha por item)</Label>
                   <Textarea
@@ -882,11 +906,11 @@ export default function EditEventPage() {
                   />
                 </div>
               </div>
-            </div>
+            </section>
 
-            <div className="space-y-4">
+            <section className="space-y-4 rounded-xl border border-[hsl(var(--gray-200))] bg-[hsl(var(--gray-50))] p-4 sm:p-5">
               <h3 className="text-xl font-semibold text-[hsl(var(--dark))]">FAQ</h3>
-              <p className="text-sm text-[hsl(var(--gray-600))]">
+              <p className="text-sm text-[hsl(var(--gray-700))]">
                 Perguntas frequentes exibidas no final da landing.
               </p>
               <div className="space-y-4">
@@ -927,31 +951,40 @@ export default function EditEventPage() {
                   </div>
                 ))}
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={handleAddFaq} className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddFaq}
+                className="gap-2"
+              >
                 <Plus className="h-4 w-4" />
                 Adicionar FAQ
               </Button>
-            </div>
+            </section>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>E-mail de suporte</Label>
-                <Input
-                  type="email"
-                  value={supportEmail}
-                  onChange={(e) => setSupportEmail(e.target.value)}
-                  placeholder="contato@evento.com"
-                />
+            <section className="space-y-4 rounded-xl border border-[hsl(var(--gray-200))] bg-[hsl(var(--gray-50))] p-4 sm:p-5">
+              <h3 className="text-xl font-semibold text-[hsl(var(--dark))]">Suporte</h3>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>E-mail de suporte</Label>
+                  <Input
+                    type="email"
+                    value={supportEmail}
+                    onChange={(e) => setSupportEmail(e.target.value)}
+                    placeholder="contato@evento.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>WhatsApp de suporte</Label>
+                  <Input
+                    value={supportWhatsapp}
+                    onChange={(e) => setSupportWhatsapp(e.target.value)}
+                    placeholder="+55 11 99999-9999"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>WhatsApp de suporte</Label>
-                <Input
-                  value={supportWhatsapp}
-                  onChange={(e) => setSupportWhatsapp(e.target.value)}
-                  placeholder="+55 11 99999-9999"
-                />
-              </div>
-            </div>
+            </section>
 
             <div className="flex justify-end">
               <Button type="button" onClick={handleLandingSave} disabled={isSavingLanding}>
@@ -963,35 +996,37 @@ export default function EditEventPage() {
 
         {/* Tab: Modalidades */}
         {activeTab === 'modalities' && (
-          <Card className="p-6">
+          <Card className="border-[hsl(var(--gray-300))] p-4 shadow-sm sm:p-6">
             <ModalityManager eventId={params.id as string} />
           </Card>
         )}
 
         {/* Tab: Lotes */}
         {activeTab === 'batches' && (
-          <Card className="p-6">
+          <Card className="border-[hsl(var(--gray-300))] p-4 shadow-sm sm:p-6">
             <BatchManager eventId={params.id as string} />
           </Card>
         )}
 
         {/* Tab: Cupons */}
         {activeTab === 'coupons' && (
-          <Card className="p-6">
+          <Card className="border-[hsl(var(--gray-300))] p-4 shadow-sm sm:p-6">
             <CouponManager eventId={params.id as string} />
           </Card>
         )}
 
         {/* Tab: Kit */}
         {activeTab === 'kit' && (
-          <Card className="p-6">
+          <Card className="border-[hsl(var(--gray-300))] p-4 shadow-sm sm:p-6">
             <KitManager eventId={params.id as string} />
           </Card>
         )}
 
         {/* Tab: Inscrições */}
         {activeTab === 'registrations' && event && (
-          <RegistrationsManager eventId={params.id as string} accessToken={accessToken || ''} />
+          <Card className="border-[hsl(var(--gray-300))] p-4 shadow-sm sm:p-6">
+            <RegistrationsManager eventId={params.id as string} accessToken={accessToken || ''} />
+          </Card>
         )}
       </main>
     </div>

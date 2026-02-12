@@ -169,7 +169,9 @@ export default function NewEventPage() {
 
       if (err.status !== 401) {
         if (err.data?.details) {
-          const validationErrors = err.data.details.map((e: any) => `${e.path?.join('.')}: ${e.message}`).join(' | ');
+          const validationErrors = err.data.details
+            .map((e: any) => `${e.path?.join('.')}: ${e.message}`)
+            .join(' | ');
           setError(`Dados inválidos: ${validationErrors}`);
         } else {
           setError(err.message || 'Erro ao criar evento');
@@ -220,37 +222,39 @@ export default function NewEventPage() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-off-white">
+    <div className="min-h-screen bg-[hsl(var(--gray-100))]">
       <DashboardNav />
 
       {/* Header */}
-      <div className="bg-white border-b border-neutral-light-gray">
-        <div className="max-w-[1200px] mx-auto px-4 tablet:px-8 desktop:px-10 py-8">
+      <div className="border-b border-[hsl(var(--gray-200))] bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
           <Link
             href="/app/events"
-            className="inline-flex items-center text-sm text-neutral-gray hover:text-neutral-charcoal mb-4 cursor-pointer"
+            className="mb-4 inline-flex items-center text-sm text-[hsl(var(--gray-700))] hover:text-[hsl(var(--dark))] cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar para eventos
           </Link>
-          <h1 className="text-2xl font-bold text-neutral-charcoal">Novo Evento</h1>
-          <p className="text-lg text-neutral-gray mt-2">
+          <h1 className="text-3xl font-bold text-[hsl(var(--dark))] sm:text-4xl font-sans">
+            Novo Evento
+          </h1>
+          <p className="mt-2 text-base text-[hsl(var(--gray-700))] sm:text-lg">
             Siga as etapas para criar seu evento esportivo
           </p>
         </div>
       </div>
 
       {/* Tabs de Navegação - Sticky */}
-      <div className="bg-white border-b border-neutral-light-gray sticky top-0 z-40 shadow-card">
-        <div className="max-w-[1200px] mx-auto px-4 tablet:px-8 desktop:px-10">
+      <div className="sticky top-0 z-40 border-b border-[hsl(var(--gray-200))] bg-white">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-10">
           <div className="flex gap-1">
             <button
               onClick={() => setActiveTab('info')}
               disabled={true}
               className={`px-6 py-3 font-medium text-sm transition-colors ${
                 activeTab === 'info'
-                  ? 'border-b-2 border-neutral-charcoal text-neutral-charcoal'
-                  : 'text-neutral-gray cursor-not-allowed'
+                  ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
+                  : 'text-[hsl(var(--gray-700))] cursor-not-allowed'
               }`}
             >
               Informações Básicas
@@ -260,23 +264,23 @@ export default function NewEventPage() {
               disabled={!createdEventId}
               className={`px-6 py-3 font-medium text-sm transition-colors ${
                 activeTab === 'modalities'
-                  ? 'border-b-2 border-neutral-charcoal text-neutral-charcoal'
+                  ? 'border-b-2 border-[hsl(var(--dark))] text-[hsl(var(--dark))]'
                   : createdEventId
-                  ? 'text-neutral-gray hover:text-neutral-charcoal hover:bg-neutral-off-white rounded-t-md cursor-pointer'
-                  : 'text-neutral-gray cursor-not-allowed'
+                    ? 'rounded-t-md text-[hsl(var(--gray-700))] hover:text-[hsl(var(--dark))] hover:bg-[hsl(var(--gray-50))] cursor-pointer'
+                    : 'text-[hsl(var(--gray-700))] cursor-not-allowed'
               }`}
             >
               Modalidades
             </button>
             <button
               disabled
-              className="px-6 py-3 font-medium text-sm text-neutral-gray cursor-not-allowed"
+              className="px-6 py-3 text-sm font-medium text-[hsl(var(--gray-700))] cursor-not-allowed"
             >
               Lotes
             </button>
             <button
               disabled
-              className="px-6 py-3 font-medium text-sm text-neutral-gray cursor-not-allowed"
+              className="px-6 py-3 text-sm font-medium text-[hsl(var(--gray-700))] cursor-not-allowed"
             >
               Cupons
             </button>
@@ -285,7 +289,7 @@ export default function NewEventPage() {
       </div>
 
       {/* Content */}
-      <main className="max-w-[1200px] mx-auto px-4 tablet:px-8 desktop:px-10 py-12">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-12">
         {/* Etapa 1: Informações Básicas */}
         {activeTab === 'info' && (
           <Card className="p-6">
@@ -338,7 +342,7 @@ export default function NewEventPage() {
 
               {/* Data do Evento */}
               <div className="space-y-4">
-                <h3 className="text-lg font-bold text-neutral-charcoal flex items-center gap-2">
+                <h3 className="flex items-center gap-2 text-lg font-bold text-[hsl(var(--dark))]">
                   <Calendar className="h-5 w-5" />
                   Datas
                 </h3>
@@ -401,7 +405,7 @@ export default function NewEventPage() {
                     disabled={isLoading}
                   />
                   {cepLoading && (
-                    <p className="text-sm text-neutral-gray">Buscando endereço...</p>
+                    <p className="text-sm text-[hsl(var(--gray-700))]">Buscando endereço...</p>
                   )}
                   {cepError && <p className="text-sm text-red-600">{cepError}</p>}
                 </div>
@@ -454,9 +458,11 @@ export default function NewEventPage() {
 
               {/* Configurações de Inscrição */}
               <div className="space-y-4">
-                <h3 className="text-lg font-bold text-neutral-charcoal">Configurações de Inscrição</h3>
-                
-                <div className="space-y-4 p-4 bg-neutral-off-white rounded-md border border-neutral-light-gray">
+                <h3 className="text-lg font-bold text-[hsl(var(--dark))]">
+                  Configurações de Inscrição
+                </h3>
+
+                <div className="space-y-4 rounded-md border border-[hsl(var(--gray-200))] bg-[hsl(var(--gray-50))] p-4">
                   <div className="flex items-start gap-3">
                     <input
                       type="checkbox"
@@ -470,7 +476,7 @@ export default function NewEventPage() {
                       <Label htmlFor="allowGroupReg" className="font-bold cursor-pointer">
                         Permitir inscrição de terceiros
                       </Label>
-                      <p className="text-sm text-neutral-gray mt-1">
+                      <p className="mt-1 text-sm text-[hsl(var(--gray-700))]">
                         Permite que participantes inscrevam outras pessoas na mesma compra
                       </p>
                     </div>
@@ -478,9 +484,7 @@ export default function NewEventPage() {
 
                   {watch('allowGroupReg') && (
                     <div className="space-y-2 ml-7">
-                      <Label htmlFor="maxGroupSize">
-                        Máximo de pessoas por compra
-                      </Label>
+                      <Label htmlFor="maxGroupSize">Máximo de pessoas por compra</Label>
                       <Input
                         id="maxGroupSize"
                         type="number"
@@ -493,8 +497,9 @@ export default function NewEventPage() {
                         disabled={isLoading}
                         className="w-32"
                       />
-                      <p className="text-xs text-neutral-gray">
-                        Limite de participantes que podem ser inscritos em uma única compra (mínimo: 1, máximo: 100)
+                      <p className="text-xs text-[hsl(var(--gray-700))]">
+                        Limite de participantes que podem ser inscritos em uma única compra (mínimo:
+                        1, máximo: 100)
                       </p>
                     </div>
                   )}
@@ -522,7 +527,7 @@ export default function NewEventPage() {
           <Card className="p-6">
             <ModalityManager eventId={createdEventId} />
 
-            <div className="flex gap-4 pt-6 mt-6 border-t border-neutral-light-gray">
+            <div className="mt-6 flex gap-4 border-t border-[hsl(var(--gray-200))] pt-6">
               <Button
                 type="button"
                 variant="outline"
@@ -532,11 +537,7 @@ export default function NewEventPage() {
                 <ArrowLeft className="h-4 w-4" />
                 Voltar
               </Button>
-              <Button
-                type="button"
-                onClick={handleFinish}
-                className="flex-1"
-              >
+              <Button type="button" onClick={handleFinish} className="flex-1">
                 Finalizar
               </Button>
             </div>

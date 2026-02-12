@@ -1,17 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { useAuthStore } from '@/stores/authStore';
 import { apiGet, apiDelete, ApiError } from '@/lib/api';
 import {
   Calendar,
-  MapPin,
   Users,
   Plus,
   Edit,
@@ -42,11 +39,11 @@ interface Event {
 }
 
 export default function EventsPage() {
-  const router = useRouter();
-  const { accessToken } = useAuthStore();
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PUBLISHED' | 'DRAFT' | 'CANCELLED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PUBLISHED' | 'DRAFT' | 'CANCELLED'>(
+    'ALL'
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
 
@@ -94,7 +91,9 @@ export default function EventsPage() {
 
   const InfoItem = ({ label, value }: { label: string; value: string }) => (
     <div className="flex flex-col gap-1">
-      <span className="text-[11px] uppercase tracking-[0.08em] text-[hsl(var(--gray-500))]">{label}</span>
+      <span className="text-[11px] uppercase tracking-[0.08em] text-[hsl(var(--gray-700))]">
+        {label}
+      </span>
       <span className="text-sm font-medium text-[hsl(var(--dark))]">{value}</span>
     </div>
   );
@@ -147,12 +146,14 @@ export default function EventsPage() {
       <DashboardNav />
 
       {/* Header */}
-      <div className="bg-white border-b border-[hsl(var(--gray-200))]">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10 py-8 space-y-6">
+      <div className="border-b border-[hsl(var(--gray-200))] bg-white">
+        <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-10">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-4xl font-bold text-[hsl(var(--dark))] font-sans">Meus Eventos</h1>
-              <p className="text-lg text-[hsl(var(--gray-600))] mt-2">
+              <h1 className="text-3xl font-bold text-[hsl(var(--dark))] sm:text-4xl font-sans">
+                Meus Eventos
+              </h1>
+              <p className="mt-2 text-base text-[hsl(var(--gray-700))] sm:text-lg">
                 Gerencie seus eventos esportivos
               </p>
             </div>
@@ -196,10 +197,10 @@ export default function EventsPage() {
       </div>
 
       {/* Content */}
-      <main className="max-w-7xl mx-auto px-6 lg:px-10 py-12">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-12">
         {isLoading ? (
           <div className="text-center py-12">
-            <p className="text-[hsl(var(--gray-600))]">Carregando eventos...</p>
+            <p className="text-[hsl(var(--gray-700))]">Carregando eventos...</p>
           </div>
         ) : events.length === 0 ? (
           <Card>
@@ -208,7 +209,7 @@ export default function EventsPage() {
               <h3 className="text-xl font-semibold text-[hsl(var(--dark))] mb-2">
                 Nenhum evento cadastrado
               </h3>
-              <p className="text-[hsl(var(--gray-600))] mb-6">
+              <p className="text-[hsl(var(--gray-700))] mb-6">
                 Comece criando seu primeiro evento esportivo
               </p>
               <Link href="/app/events/new">
@@ -228,104 +229,118 @@ export default function EventsPage() {
                   <h3 className="text-xl font-semibold text-[hsl(var(--dark))] mb-2">
                     Nenhum evento encontrado
                   </h3>
-                  <p className="text-[hsl(var(--gray-600))]">
+                  <p className="text-[hsl(var(--gray-700))]">
                     Ajuste os filtros ou cadastre um novo evento.
                   </p>
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
                 {filteredEvents.map((event) => (
-              <Card key={event.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex justify-between items-start mb-2">
-                    <CardTitle className="text-xl line-clamp-1">{event.name}</CardTitle>
-                    {getStatusBadge(event.status)}
-                  </div>
-                  <CardDescription className="line-clamp-2">{event.description}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4 mb-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <InfoItem label="Data" value={formatDate(event.eventDate)} />
-                      {event.location && (
-                        <InfoItem label="Local" value={`${event.location.city}, ${event.location.state}`} />
-                      )}
-                      <InfoItem label="Inscrições" value={`${event._count.registrations} ${event._count.registrations === 1 ? 'inscrição' : 'inscrições'}`} />
-                      <InfoItem
-                        label="Modalidades ativas"
-                        value={`${event._count.modalities} ${event._count.modalities === 1 ? 'modalidade' : 'modalidades'}`}
-                      />
-                    </div>
-
-                    {event.status === 'PUBLISHED' && (
-                      (() => {
-                        const daysToEnd = daysUntil(event.registrationEnd);
-                        if (daysToEnd <= 7) {
-                          return (
-                            <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                              <AlertTriangle className="h-4 w-4" />
-                              {daysToEnd >= 0
-                                ? `Inscrições encerram em ${daysToEnd} dia${daysToEnd === 1 ? '' : 's'}`
-                                : 'Inscrições encerradas'}
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <div className="flex gap-2">
-                      <Link href={`/app/events/${event.id}/edit`} className="flex-1">
-                        <Button variant="outline" size="sm" className="w-full gap-2">
-                          <Edit className="h-4 w-4" />
-                          Editar
-                        </Button>
-                      </Link>
-                      {event.status === 'PUBLISHED' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 gap-2"
-                          onClick={() => handleCopyLink(event)}
-                        >
-                          {copiedEventId === event.id ? (
-                            <>
-                              <Check className="h-4 w-4" />
-                              Copiado
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-4 w-4" />
-                              Copiar link
-                            </>
+                  <Card
+                    key={event.id}
+                    className="flex h-full flex-col transition-shadow hover:shadow-md"
+                  >
+                    <CardHeader>
+                      <div className="mb-2 flex items-start justify-between gap-2">
+                        <CardTitle className="line-clamp-1 text-xl">{event.name}</CardTitle>
+                        {getStatusBadge(event.status)}
+                      </div>
+                      <CardDescription className="line-clamp-2 text-[hsl(var(--gray-700))]">
+                        {event.description}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="mt-auto flex flex-1 flex-col">
+                      <div className="mb-4 space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <InfoItem label="Data" value={formatDate(event.eventDate)} />
+                          {event.location && (
+                            <InfoItem
+                              label="Local"
+                              value={`${event.location.city}, ${event.location.state}`}
+                            />
                           )}
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(event.id)}
-                        className="gap-2"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {event.status === 'PUBLISHED' && (
-                      <Link href={`/e/${event.slug}`} target="_blank">
-                        <Button variant="ghost" size="sm" className="w-full gap-2 text-[hsl(var(--accent-pink))]">
-                          <Link2 className="h-4 w-4" />
-                          Ver página pública
-                        </Button>
-                      </Link>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                          <InfoItem
+                            label="Inscrições"
+                            value={`${event._count.registrations} ${event._count.registrations === 1 ? 'inscrição' : 'inscrições'}`}
+                          />
+                          <InfoItem
+                            label="Modalidades ativas"
+                            value={`${event._count.modalities} ${event._count.modalities === 1 ? 'modalidade' : 'modalidades'}`}
+                          />
+                        </div>
+
+                        {event.status === 'PUBLISHED' &&
+                          (() => {
+                            const daysToEnd = daysUntil(event.registrationEnd);
+                            if (daysToEnd <= 7) {
+                              return (
+                                <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                                  <AlertTriangle className="h-4 w-4" />
+                                  {daysToEnd >= 0
+                                    ? `Inscrições encerram em ${daysToEnd} dia${daysToEnd === 1 ? '' : 's'}`
+                                    : 'Inscrições encerradas'}
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+                      </div>
+
+                      <div className="mt-auto flex flex-col gap-2">
+                        <div className="flex gap-2">
+                          <Link href={`/app/events/${event.id}/edit`} className="flex-1">
+                            <Button variant="outline" size="sm" className="w-full gap-2">
+                              <Edit className="h-4 w-4" />
+                              Editar
+                            </Button>
+                          </Link>
+                          {event.status === 'PUBLISHED' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 gap-2"
+                              onClick={() => handleCopyLink(event)}
+                            >
+                              {copiedEventId === event.id ? (
+                                <>
+                                  <Check className="h-4 w-4" />
+                                  Copiado
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-4 w-4" />
+                                  Copiar link
+                                </>
+                              )}
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelete(event.id)}
+                            className="gap-2"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {event.status === 'PUBLISHED' && (
+                          <Link href={`/e/${event.slug}`} target="_blank">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full gap-2 text-[hsl(var(--accent-pink))]"
+                            >
+                              <Link2 className="h-4 w-4" />
+                              Ver página pública
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             )}
           </>
         )}

@@ -9,7 +9,14 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { useAuthStore } from '@/stores/authStore';
 
 // Schema de validação
@@ -72,11 +79,11 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-[hsl(var(--gray-100))] px-4 py-12">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Entrar</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-2xl font-bold text-[hsl(var(--dark))]">Entrar</CardTitle>
+          <CardDescription className="text-[hsl(var(--gray-700))]">
             Entre com seu email e senha para acessar sua conta
           </CardDescription>
         </CardHeader>
@@ -84,7 +91,7 @@ export default function LoginPage() {
           <CardContent className="space-y-4">
             {/* Credenciais de Teste - DEV ONLY */}
             {process.env.NODE_ENV === 'development' && (
-              <div className="rounded-md bg-blue-50 p-3 text-xs border border-blue-200">
+              <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs">
                 <p className="font-semibold text-blue-900 mb-1">🔧 Acesso de Teste (DEV):</p>
                 <p className="text-blue-700">Email: maria@okesports.com</p>
                 <p className="text-blue-700">Senha: Senha123</p>
@@ -97,11 +104,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            {error && (
-              <div className="rounded-md bg-red-50 p-3 text-sm text-red-800">
-                {error}
-              </div>
-            )}
+            {error && <div className="rounded-md bg-red-50 p-3 text-sm text-red-800">{error}</div>}
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -113,9 +116,7 @@ export default function LoginPage() {
                 {...register('email')}
                 disabled={isLoading}
               />
-              {errors.email && (
-                <p className="text-sm text-red-600">{errors.email.message}</p>
-              )}
+              {errors.email && <p className="text-sm text-red-600">{errors.email.message}</p>}
             </div>
 
             <div className="space-y-2">
@@ -128,9 +129,7 @@ export default function LoginPage() {
                 {...register('password')}
                 disabled={isLoading}
               />
-              {errors.password && (
-                <p className="text-sm text-red-600">{errors.password.message}</p>
-              )}
+              {errors.password && <p className="text-sm text-red-600">{errors.password.message}</p>}
             </div>
           </CardContent>
 
@@ -139,9 +138,12 @@ export default function LoginPage() {
               {isLoading ? 'Entrando...' : 'Entrar'}
             </Button>
 
-            <p className="text-center text-sm text-gray-600">
+            <p className="text-center text-sm text-[hsl(var(--gray-700))]">
               Não tem uma conta?{' '}
-              <Link href="/register" className="font-medium text-primary hover:underline cursor-pointer">
+              <Link
+                href="/register"
+                className="font-medium text-primary hover:underline cursor-pointer"
+              >
                 Criar conta
               </Link>
             </p>
