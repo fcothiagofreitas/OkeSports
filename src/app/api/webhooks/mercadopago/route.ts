@@ -159,12 +159,13 @@ export async function POST(request: NextRequest) {
 
     // Validar payload do webhook
     const webhook = mercadoPagoWebhookSchema.parse(body);
+    const paymentIdStr = String(webhook.data.id);
 
     // Log para debug
     console.log('📥 Webhook MP recebido:', {
       type: webhook.type,
       action: webhook.action,
-      paymentId: webhook.data.id,
+      paymentId: paymentIdStr,
       timestamp: new Date().toISOString(),
     });
 
@@ -176,7 +177,7 @@ export async function POST(request: NextRequest) {
     // Buscar inscrição: primeiro por paymentId
     let registration = await prisma.registration.findFirst({
       where: {
-        paymentId: webhook.data.id,
+        paymentId: paymentIdStr,
       },
       include: {
         event: {
@@ -217,7 +218,7 @@ export async function POST(request: NextRequest) {
         const appToken = process.env.MP_TEST_ACCESS_TOKEN || process.env.MP_TEST_SELLER_TOKEN;
         if (appToken) {
           const paymentResponse = await fetch(
-            `https://api.mercadopago.com/v1/payments/${webhook.data.id}`,
+            `https://api.mercadopago.com/v1/payments/${paymentIdStr}`,
             {
               headers: { Authorization: `Bearer ${appToken}` },
             }
@@ -272,16 +273,17 @@ export async function POST(request: NextRequest) {
     }
 
     if (!registration) {
-      console.error('❌ Inscrição não encontrada para payment:', webhook.data.id);
-      console.error('   Verifique se o external_reference está sendo enviado corretamente na preferência');
-      return NextResponse.json({ message: 'Inscrição não encontrada' }, { status: 404 });
+      console.warn('⚠️ Inscrição não encontrada para payment:', paymentIdStr);
+      console.warn('   Verifique se o external_reference está sendo enviado corretamente na preferência');
+      // Retornar 200 para o MP não considerar falha e não reenviar; em produção o payment pode ser de outro ambiente
+      return NextResponse.json({ message: 'Inscrição não encontrada para este payment_id' }, { status: 200 });
     }
     
     // Se encontrou pelo external_reference mas não tem paymentId salvo, salvar agora
     if (!registration.paymentId) {
       await prisma.registration.update({
         where: { id: registration.id },
-        data: { paymentId: webhook.data.id.toString() },
+        data: { paymentId: paymentIdStr },
       });
       console.log('✅ paymentId salvo na inscrição:', registration.id);
     }
@@ -295,7 +297,7 @@ export async function POST(request: NextRequest) {
     });
 
     const paymentDetails = await fetch(
-      `https://api.mercadopago.com/v1/payments/${webhook.data.id}`,
+      `https://api.mercadopago.com/v1/payments/${paymentIdStr}`,
       {
         headers: { Authorization: `Bearer ${mpAccessToken}` },
       }
@@ -412,7 +414,7 @@ export async function POST(request: NextRequest) {
       await prisma.registration.update({
         where: { id: registration.id },
         data: {
-          paymentId: webhook.data.id.toString(),
+          paymentId: paymentIdStr,
           paymentStatus: 'APPROVED',
           status: 'CONFIRMED',
           paymentMethod,
@@ -533,25 +535,25 @@ export async function POST(request: NextRequest) {
     // O Mercado Pago enviará outro webhook quando o status mudar para 'approved'
     
     // Salvar paymentId mesmo em status intermediário para facilitar rastreamento
-    if (!registration.paymentId || registration.paymentId !== webhook.data.id.toString()) {
+    if (!registration.paymentId || registration.paymentId !== paymentIdStr) {
       await prisma.registration.update({
         where: { id: registration.id },
         data: { 
-          paymentId: webhook.data.id.toString(),
+          paymentId: paymentIdStr,
           // Manter PENDING para status intermediários (o enum não tem IN_PROCESS, usa PROCESSING)
           paymentStatus: paymentStatus === 'in_process' ? 'PROCESSING' : 'PENDING',
         },
       });
       console.log('💾 paymentId e status intermediário salvos:', {
         registrationId: registration.id,
-        paymentId: webhook.data.id,
+        paymentId: paymentIdStr,
         status: paymentStatus,
         statusDetail: statusDetail,
       });
     }
 
     console.log('⏳ Pagamento em processamento:', {
-      paymentId: webhook.data.id,
+      paymentId: paymentIdStr,
       status: paymentStatus,
       statusDetail: statusDetail,
       message: 'Aguardando aprovação. O Mercado Pago enviará outro webhook quando o status mudar.',

@@ -202,6 +202,12 @@ export async function POST(request: NextRequest) {
       ? `Inscrição #${registration.registrationNumber} | Evento: ${formattedEventDate} | Participante: ${registration.participant.fullName}`
       : `${registrations.length} inscrição(ões) | Evento: ${formattedEventDate} | Números: ${registrations.map((r) => `#${r.registrationNumber}`).join(', ')}`;
 
+    // Sobrenome do comprador: melhora aprovação e reduz rejeição por antifraude (recomendação MP)
+    const fullName = registration.participant.fullName.trim();
+    const payerLastName = fullName.includes(' ')
+      ? fullName.slice(fullName.lastIndexOf(' ') + 1)
+      : fullName;
+
     const preferenceData: any = {
       items: [
         {
@@ -215,6 +221,7 @@ export async function POST(request: NextRequest) {
       ],
       payer: {
         name: registration.participant.fullName,
+        last_name: payerLastName, // Ação recomendada MP: melhora aprovação e reduz rejeição por antifraude
         email: registration.participant.email,
       },
       back_urls: {
