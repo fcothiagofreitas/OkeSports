@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { useAuthStore } from '@/stores/authStore';
 import { apiPost } from '@/lib/api';
+import { fetchAddressByCep } from '@/lib/cep';
 import { ArrowLeft, ArrowRight, Calendar, MapPin } from 'lucide-react';
 import { DashboardNav } from '@/components/layout/DashboardNav';
 import { ModalityManager } from '@/components/features/events/ModalityManager';
@@ -30,6 +31,7 @@ const eventSchema = z
     city: z.string().min(2, 'Cidade é obrigatória'),
     state: z.string().length(2, 'Estado deve ter 2 caracteres (ex: SP)'),
     address: z.string().optional(),
+    neighborhood: z.string().optional(),
     zipCode: z.string().optional(),
     allowGroupReg: z.boolean().default(true),
     maxGroupSize: z.number().int().min(1).max(100).default(10).optional(),
@@ -67,6 +69,8 @@ export default function NewEventPage() {
   const [hasDraft, setHasDraft] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [createdEventId, setCreatedEventId] = useState<string | null>(null);
+  const [cepLoading, setCepLoading] = useState(false);
+  const [cepError, setCepError] = useState<string | null>(null);
 
   const {
     register,
@@ -74,6 +78,7 @@ export default function NewEventPage() {
     formState: { errors },
     watch,
     reset,
+    setValue,
   } = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
     defaultValues: {
@@ -95,6 +100,19 @@ export default function NewEventPage() {
       }
     }
   }, [reset]);
+
+  // Ajustar fim das inscrições para 5 dias antes do evento quando a data do evento mudar
+  const eventDate = watch('eventDate');
+  useEffect(() => {
+    if (!eventDate) return;
+    const d = new Date(eventDate + 'T12:00:00');
+    if (Number.isNaN(d.getTime())) return;
+    d.setDate(d.getDate() - 5);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    setValue('registrationEnd', `${y}-${m}-${day}`);
+  }, [eventDate, setValue]);
 
   // Auto-save: salvar no localStorage quando os campos mudarem
   useEffect(() => {
@@ -131,7 +149,7 @@ export default function NewEventPage() {
         location: {
           street: data.address || 'Não informado',
           number: 'S/N',
-          neighborhood: 'Centro',
+          neighborhood: data.neighborhood || 'Centro',
           city: data.city,
           state: data.state.toUpperCase(),
           cep: data.zipCode || '00000-000',
@@ -173,6 +191,31 @@ export default function NewEventPage() {
   const handleFinish = () => {
     if (createdEventId) {
       router.push(`/app/events/${createdEventId}/edit`);
+    }
+  };
+
+  const handleCepBlur = async () => {
+    const cep = watch('zipCode');
+    if (!cep || cep.replace(/\D/g, '').length !== 8) {
+      setCepError(null);
+      return;
+    }
+    setCepError(null);
+    setCepLoading(true);
+    try {
+      const address = await fetchAddressByCep(cep);
+      if (address) {
+        setValue('address', address.street);
+        setValue('neighborhood', address.neighborhood);
+        setValue('city', address.city);
+        setValue('state', address.state);
+      } else {
+        setCepError('CEP não encontrado');
+      }
+    } catch {
+      setCepError('Erro ao buscar CEP');
+    } finally {
+      setCepLoading(false);
     }
   };
 
@@ -348,6 +391,41 @@ export default function NewEventPage() {
                   Localização
                 </h3>
 
+                <div className="space-y-2">
+                  <Label htmlFor="zipCode">CEP</Label>
+                  <Input
+                    id="zipCode"
+                    placeholder="00000-000"
+                    {...register('zipCode')}
+                    onBlur={handleCepBlur}
+                    disabled={isLoading}
+                  />
+                  {cepLoading && (
+                    <p className="text-sm text-neutral-gray">Buscando endereço...</p>
+                  )}
+                  {cepError && <p className="text-sm text-red-600">{cepError}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="address">Endereço (logradouro)</Label>
+                  <Input
+                    id="address"
+                    placeholder="Rua, avenida..."
+                    {...register('address')}
+                    disabled={isLoading}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="neighborhood">Bairro</Label>
+                  <Input
+                    id="neighborhood"
+                    placeholder="Bairro"
+                    {...register('neighborhood')}
+                    disabled={isLoading}
+                  />
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="city">Cidade *</Label>
@@ -371,26 +449,6 @@ export default function NewEventPage() {
                     />
                     {errors.state && <p className="text-sm text-red-600">{errors.state.message}</p>}
                   </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="address">Endereço Completo</Label>
-                  <Input
-                    id="address"
-                    placeholder="Rua, número, bairro..."
-                    {...register('address')}
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="zipCode">CEP</Label>
-                  <Input
-                    id="zipCode"
-                    placeholder="00000-000"
-                    {...register('zipCode')}
-                    disabled={isLoading}
-                  />
                 </div>
               </div>
 

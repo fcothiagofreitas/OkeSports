@@ -22,6 +22,7 @@ import {
 import { useAuthStore } from '@/stores/authStore';
 import { ArrowLeft, Calendar, Users, ExternalLink, Copy, Check, Trash2, Plus } from 'lucide-react';
 import { apiGet, apiPatch, ApiError } from '@/lib/api';
+import { fetchAddressByCep } from '@/lib/cep';
 import { DashboardNav } from '@/components/layout/DashboardNav';
 import { ModalityManager } from '@/components/features/events/ModalityManager';
 import { BatchManager } from '@/components/features/events/BatchManager';
@@ -44,6 +45,7 @@ const eventSchema = z
     city: z.string().min(2, 'Cidade é obrigatória'),
     state: z.string().length(2, 'Estado deve ter 2 caracteres (ex: SP)'),
     address: z.string().optional(),
+    neighborhood: z.string().optional(),
     zipCode: z.string().optional(),
   })
   .superRefine((data, ctx) => {
@@ -137,12 +139,16 @@ export default function EditEventPage() {
   const [supportEmail, setSupportEmail] = useState('');
   const [supportWhatsapp, setSupportWhatsapp] = useState('');
   const [isSavingLanding, setIsSavingLanding] = useState(false);
+  const [cepLoading, setCepLoading] = useState(false);
+  const [cepError, setCepError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
+    watch,
+    setValue,
   } = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
   });
@@ -169,6 +175,7 @@ export default function EditEventPage() {
         city: data.location?.city || '',
         state: data.location?.state || '',
         address: data.location?.street || '',
+        neighborhood: data.location?.neighborhood || '',
         zipCode: data.location?.cep || '',
       });
       const points = Array.isArray(data.landingSellingPoints)
@@ -199,6 +206,31 @@ export default function EditEventPage() {
     }
   };
 
+  const handleCepBlur = async () => {
+    const cep = watch('zipCode');
+    if (!cep || cep.replace(/\D/g, '').length !== 8) {
+      setCepError(null);
+      return;
+    }
+    setCepError(null);
+    setCepLoading(true);
+    try {
+      const address = await fetchAddressByCep(cep);
+      if (address) {
+        setValue('address', address.street);
+        setValue('neighborhood', address.neighborhood);
+        setValue('city', address.city);
+        setValue('state', address.state);
+      } else {
+        setCepError('CEP não encontrado');
+      }
+    } catch {
+      setCepError('Erro ao buscar CEP');
+    } finally {
+      setCepLoading(false);
+    }
+  };
+
   const onSubmit = async (data: EventFormData) => {
     try {
       setIsLoading(true);
@@ -221,7 +253,7 @@ export default function EditEventPage() {
         location: {
           street: data.address || 'Não informado',
           number: 'S/N',
-          neighborhood: 'Centro',
+          neighborhood: data.neighborhood || 'Centro',
           city: data.city,
           state: data.state.toUpperCase(),
           cep: data.zipCode || '00000-000',
@@ -713,6 +745,36 @@ export default function EditEventPage() {
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-[hsl(var(--dark))]">Localização</h3>
 
+                    <div className="space-y-2">
+                      <Label htmlFor="zipCode">CEP</Label>
+                      <Input
+                        id="zipCode"
+                        placeholder="00000-000"
+                        {...register('zipCode')}
+                        onBlur={handleCepBlur}
+                        disabled={isLoading}
+                      />
+                      {cepLoading && (
+                        <p className="text-sm text-[hsl(var(--gray-600))]">Buscando endereço...</p>
+                      )}
+                      {cepError && <p className="text-sm text-red-600">{cepError}</p>}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="address">Endereço (logradouro)</Label>
+                      <Input id="address" {...register('address')} disabled={isLoading} />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="neighborhood">Bairro</Label>
+                      <Input
+                        id="neighborhood"
+                        placeholder="Bairro"
+                        {...register('neighborhood')}
+                        disabled={isLoading}
+                      />
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2 md:col-span-2">
                         <Label htmlFor="city">Cidade *</Label>
@@ -734,16 +796,6 @@ export default function EditEventPage() {
                           <p className="text-sm text-red-600">{errors.state.message}</p>
                         )}
                       </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="address">Endereço Completo</Label>
-                      <Input id="address" {...register('address')} disabled={isLoading} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="zipCode">CEP</Label>
-                      <Input id="zipCode" {...register('zipCode')} disabled={isLoading} />
                     </div>
                   </div>
 
