@@ -234,17 +234,19 @@ export default async function EventPublicPage({ params }: EventPageProps) {
   const whatsappLink = supportWhatsapp ? `https://wa.me/${supportWhatsapp.replace(/\D/g, '')}` : null;
 
   return (
-    <div className="min-h-screen bg-[#e9e9e9] py-4 sm:py-6">
-      <div className="mx-auto max-w-[1220px] rounded-[26px] bg-[#f8f8f8] p-4 sm:p-6">
-        <header className="flex items-center justify-between rounded-[16px] bg-white px-4 py-3 sm:px-6">
-          <p className="text-sm font-bold tracking-[0.08em]">OKE SPORTS</p>
+    <div className="min-h-screen bg-[#e9e9e9]">
+      <div className="border-b border-[#e5e7eb] bg-white">
+        <div className="flex items-center justify-between px-4 py-3 sm:px-8">
+          <p className="text-sm font-bold tracking-[0.08em] text-[#0f172a]">🏃 Okê Sports</p>
           <div className="hidden items-center gap-6 text-xs text-[#6b7280] md:flex">
             <span>{event.location ? `${event.location.city}, ${event.location.state}` : 'Evento esportivo'}</span>
             <span>{eventDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}</span>
           </div>
-        </header>
+        </div>
+      </div>
 
-        <section className="mt-4 overflow-hidden rounded-[20px] bg-[#05060b] text-white">
+      <div className="w-full px-3 py-4 sm:px-6 sm:py-6">
+        <section className="overflow-hidden rounded-[20px] bg-[#05060b] text-white">
           <div className="relative">
             <div className="absolute inset-0">
               <img alt={event.name} className="h-full w-full object-cover opacity-35" src={heroImage} />
@@ -276,14 +278,14 @@ export default async function EventPublicPage({ params }: EventPageProps) {
               <h1 className="mt-6 text-4xl leading-tight sm:text-6xl">{event.name}</h1>
               <p className="mt-3 max-w-[640px] text-sm leading-7 text-white/80 sm:text-base">{aboutDescription}</p>
 
-              <div className="mt-8 grid gap-4 md:grid-cols-2 xl:max-w-[760px]">
+              <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {event.modalities.length > 0 ? (
                   event.modalities.map((modality) => {
                     const price = Number(modality.price);
                     const pricing = buildPrice(price, event.activeBatch);
 
                     return (
-                      <article key={modality.id} className="rounded-3xl border border-black/10 bg-white p-4 text-[#0f172a] shadow-sm">
+                    <article key={modality.id} className="rounded-3xl border border-black/10 bg-white p-4 text-[#0f172a] shadow-sm">
                         <p className="text-xl font-semibold">{modality.name}</p>
                         {modality.description && <p className="mt-1 text-sm text-[#6b7280]">{modality.description}</p>}
 
@@ -308,7 +310,7 @@ export default async function EventPublicPage({ params }: EventPageProps) {
                     );
                   })
                 ) : (
-                  <article className="md:col-span-2 rounded-2xl border border-dashed border-white/25 p-8 text-sm text-white/70">
+                  <article className="md:col-span-2 lg:col-span-3 xl:col-span-4 rounded-2xl border border-dashed border-white/25 p-8 text-sm text-white/70">
                     Modalidades em breve.
                   </article>
                 )}
