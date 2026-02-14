@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { ArrowRight, Calendar, Mail, MapPin, MessageCircle, Minus, Plus } from 'lucide-react';
+import { Calendar, MapPin, Mail, MessageCircle } from 'lucide-react';
 import { RegistrationButton } from '@/components/events/RegistrationButton';
 import { LandingIcon } from '@/components/events/LandingIcon';
 import type { LandingIconKey } from '@/constants/landingIcons';
@@ -57,6 +57,13 @@ async function getEvent(slug: string) {
             _count: { select: { registrations: true } },
           },
         },
+        kit: {
+          include: {
+            sizes: {
+              orderBy: { size: 'asc' },
+            },
+          },
+        },
         _count: { select: { registrations: true } },
       },
     });
@@ -103,6 +110,7 @@ async function getEvent(slug: string) {
       supportEmail: event.supportEmail,
       supportWhatsapp: event.supportWhatsapp,
       activeBatch: activeBatchInfo,
+      kit: event.kit,
     };
   } catch (error) {
     console.error('Error fetching event:', error);
@@ -140,31 +148,24 @@ export default async function EventPublicPage({ params }: EventPageProps) {
   const dayMs = 1000 * 60 * 60 * 24;
 
   const daysToEvent = Math.max(0, Math.ceil((eventDate.getTime() - now.getTime()) / dayMs));
-  const daysToClose = Math.max(0, Math.ceil((regEnd.getTime() - now.getTime()) / dayMs));
 
   const priceFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-  const hasModalities = event.modalities.length > 0;
-  const cheapestModality = hasModalities
-    ? event.modalities.reduce((prev, curr) =>
-        Number(curr.price) < Number(prev.price) ? curr : prev,
-      event.modalities[0])
-    : null;
 
   const defaultSellingPoints = [
     {
       icon: 'trophy' as LandingIconKey,
-      title: 'Execucao de prova sem atrito',
-      description: 'Fluxo de evento com sinalizacao, suporte e comunicacao em cada etapa.',
+      title: 'Percurso premiado',
+      description: 'Circuito oficial com largada rápida e chegada cinematográfica.',
     },
     {
       icon: 'shield' as LandingIconKey,
-      title: 'Performance para organizador',
-      description: 'Landing white-label pronta para converter e escalar diferentes corridas.',
+      title: 'Segurança completa',
+      description: 'Staff, sinalização e apoio médico em todo o trajeto.',
     },
     {
       icon: 'heart' as LandingIconKey,
-      title: 'Experiencia para atleta',
-      description: 'Inscricao simples, informacoes claras e jornada completa ate a largada.',
+      title: 'Experiência completa',
+      description: 'Kit premium, pós-prova com ativações e cobertura fotográfica.',
     },
   ];
 
@@ -179,23 +180,42 @@ export default async function EventPublicPage({ params }: EventPageProps) {
       : {};
 
   const aboutDescription =
-    landingAbout.description ||
-    event.shortDescription ||
-    event.description ||
-    'Uma estrutura premium para divulgar corridas e aumentar conversao de inscricoes.';
+    landingAbout.description || event.description || event.shortDescription || 'Descrição do evento em breve.';
+
+  const includesFromLanding = Array.isArray(landingAbout.includes) ? landingAbout.includes : [];
+  const includesFromKit = Array.isArray(event.kit?.items)
+    ? event.kit.items
+        .filter((item): item is { name: string } => !!item && typeof item === 'object' && typeof (item as { name?: unknown }).name === 'string')
+        .map((item) => item.name)
+    : [];
+  const includes =
+    includesFromLanding.length > 0
+      ? includesFromLanding
+      : includesFromKit.length > 0
+        ? includesFromKit
+        : ['Camiseta oficial e número de peito', 'Hidratação e suporte médico', 'Medalha finisher exclusiva'];
+
+  const tips =
+    Array.isArray(landingAbout.tips) && landingAbout.tips.length > 0
+      ? landingAbout.tips
+      : [
+          'Chegue com pelo menos 1h de antecedência.',
+          'Opte por transporte compartilhado para evitar bloqueios.',
+          'Siga as orientações de staff e placas de acesso.',
+        ];
 
   const defaultFaq: LandingFaq[] = [
     {
-      question: 'Quando as inscricoes encerram?',
-      answer: `As inscricoes encerram em ${regEnd.toLocaleDateString('pt-BR')}.`,
+      question: 'Como funciona a retirada de kits?',
+      answer: 'Você receberá as informações por e-mail após confirmação da inscrição.',
     },
     {
-      question: 'Posso alterar dados da minha inscricao?',
-      answer: 'As alteracoes seguem as regras do organizador e do prazo do evento.',
+      question: 'Posso transferir minha inscrição?',
+      answer: 'Sim, respeitando as regras e prazos definidos pela organização.',
     },
     {
-      question: 'Quais formas de pagamento estao disponiveis?',
-      answer: 'As opcoes aparecem no checkout de inscricao do evento.',
+      question: 'Quais são as formas de pagamento?',
+      answer: 'As formas disponíveis aparecem no checkout da inscrição.',
     },
   ];
 
@@ -209,294 +229,201 @@ export default async function EventPublicPage({ params }: EventPageProps) {
     event.bannerUrl ||
     'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1600&q=80';
 
-  const caseImage =
-    event.bannerUrl ||
-    event.coverUrl ||
-    'https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=1200&q=80';
-
   const supportEmail = event.supportEmail || 'contato@okesports.com';
   const supportWhatsapp = event.supportWhatsapp || undefined;
   const whatsappLink = supportWhatsapp ? `https://wa.me/${supportWhatsapp.replace(/\D/g, '')}` : null;
 
   return (
-    <div className="min-h-screen bg-[#f1f1f1] p-3 sm:p-6">
-      <div className="mx-auto max-w-[1400px] rounded-[28px] bg-[#fafafa] p-3 sm:p-5 lg:p-6">
-        <section className="rounded-[22px] bg-white p-4 sm:p-6 lg:p-8">
-          <header className="flex items-center justify-between gap-4">
-            <p className="text-sm font-bold tracking-[0.08em]">OKE SPORTS</p>
-            <nav className="hidden items-center gap-7 text-sm text-[#5f6368] md:flex">
-              <a href="#sobre">Sobre</a>
-              <a href="#modalidades">Modalidades</a>
-              <a href="#faq">FAQ</a>
-              <a href="#contato">Contato</a>
-            </nav>
-            <div className="rounded-full bg-black px-4 py-2 text-xs font-semibold text-white">Evento Publico</div>
-          </header>
+    <div className="min-h-screen bg-[#e9e9e9] py-4 sm:py-6">
+      <div className="mx-auto max-w-[1220px] rounded-[26px] bg-[#f8f8f8] p-4 sm:p-6">
+        <header className="flex items-center justify-between rounded-[16px] bg-white px-4 py-3 sm:px-6">
+          <p className="text-sm font-bold tracking-[0.08em]">OKE SPORTS</p>
+          <div className="hidden items-center gap-6 text-xs text-[#6b7280] md:flex">
+            <span>{event.location ? `${event.location.city}, ${event.location.state}` : 'Evento esportivo'}</span>
+            <span>{eventDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}</span>
+          </div>
+        </header>
 
-          <div className="mt-8 grid gap-4 lg:grid-cols-[1.02fr_0.98fr]">
-            <div className="space-y-5">
-              <h1 className="max-w-[720px] text-4xl leading-[1.02] text-[#010205] sm:text-6xl">
-                Corra na frente com uma experiencia premium de inscricao
-              </h1>
-              <p className="max-w-[600px] text-sm leading-7 text-[#878c91] sm:text-base">{aboutDescription}</p>
+        <section className="mt-4 overflow-hidden rounded-[20px] bg-[#05060b] text-white">
+          <div className="relative">
+            <div className="absolute inset-0">
+              <img alt={event.name} className="h-full w-full object-cover opacity-35" src={heroImage} />
+              <div className="absolute inset-0 bg-gradient-to-b from-[#05060b]/70 via-[#05060b] to-[#f8f8f8]/70" />
+            </div>
 
-              <div className="flex flex-wrap gap-2 text-xs sm:text-sm">
-                <span className="inline-flex items-center gap-2 rounded-full border border-[#d6d8da] px-3 py-1.5">
-                  <Calendar className="h-4 w-4" />
+            <div className="relative p-5 sm:p-8 lg:p-10">
+              <div className="flex flex-wrap gap-2 text-[11px] sm:text-xs">
+                <span className="rounded-full border border-white/25 px-3 py-1.5 uppercase tracking-[0.12em]">
                   {eventDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
                 </span>
-                <span className="inline-flex items-center gap-2 rounded-full border border-[#d6d8da] px-3 py-1.5">
-                  <MapPin className="h-4 w-4" />
-                  {event.location ? `${event.location.city}, ${event.location.state}` : 'Local em definicao'}
+                {event.location && (
+                  <span className="rounded-full border border-white/25 px-3 py-1.5 uppercase tracking-[0.12em]">
+                    {event.location.city}, {event.location.state}
+                  </span>
+                )}
+                <span className="rounded-full border border-white/25 px-3 py-1.5 uppercase tracking-[0.12em]">
+                  Faltam {daysToEvent} dias
+                </span>
+                <span
+                  className={`rounded-full px-3 py-1.5 uppercase tracking-[0.12em] ${
+                    event.isRegistrationOpen ? 'bg-emerald-500 text-white' : 'bg-white/15 text-white'
+                  }`}
+                >
+                  {event.isRegistrationOpen ? 'Inscrições abertas' : 'Inscrições encerradas'}
                 </span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-4">
-                {cheapestModality && (
-                  <RegistrationButton
-                    eventSlug={event.slug}
-                    modalityId={cheapestModality.id}
-                    modalityName={cheapestModality.name}
-                    isDisabled={!event.isRegistrationOpen || cheapestModality.isSoldOut}
-                    disabledReason={
-                      cheapestModality.isSoldOut ? 'Esgotado' : !event.isRegistrationOpen ? 'Inscricoes Encerradas' : undefined
-                    }
-                    labelOverride={event.isRegistrationOpen ? 'Garantir vaga' : undefined}
-                    className="h-12 rounded-full px-7"
-                  />
-                )}
-                <a className="text-sm font-semibold underline" href="#modalidades">
-                  Ver modalidades
-                </a>
-              </div>
+              <h1 className="mt-6 text-4xl leading-tight sm:text-6xl">{event.name}</h1>
+              <p className="mt-3 max-w-[640px] text-sm leading-7 text-white/80 sm:text-base">{aboutDescription}</p>
 
-              <div className="grid max-w-[420px] grid-cols-3 overflow-hidden rounded-2xl border border-[#e6e7e9]">
-                <div className="p-3">
-                  <p className="text-[11px] uppercase tracking-[0.09em] text-[#878c91]">Inscritos</p>
-                  <p className="mt-1 text-2xl font-bold">{event.totalRegistrations}+</p>
-                </div>
-                <div className="border-x border-[#e6e7e9] p-3">
-                  <p className="text-[11px] uppercase tracking-[0.09em] text-[#878c91]">Largada</p>
-                  <p className="mt-1 text-2xl font-bold">{daysToEvent}d</p>
-                </div>
-                <div className="p-3">
-                  <p className="text-[11px] uppercase tracking-[0.09em] text-[#878c91]">Prazo</p>
-                  <p className="mt-1 text-2xl font-bold">{daysToClose}d</p>
-                </div>
-              </div>
-            </div>
+              <div className="mt-8 grid gap-4 md:grid-cols-2 xl:max-w-[760px]">
+                {event.modalities.length > 0 ? (
+                  event.modalities.map((modality) => {
+                    const price = Number(modality.price);
+                    const pricing = buildPrice(price, event.activeBatch);
 
-            <div className="grid gap-4 sm:grid-cols-[1fr_260px]">
-              <div className="overflow-hidden rounded-[20px] bg-[#010205]">
-                <img alt={event.name} className="h-full min-h-[280px] w-full object-cover opacity-70" src={heroImage} />
-              </div>
-              <div className="grid gap-4">
-                <div className="rounded-[20px] bg-[#efefef] p-5">
-                  <p className="text-5xl font-bold text-[#010205]">{event.activeBatch ? '230+' : '100+'}</p>
-                  <p className="mt-3 text-sm text-[#5c5d5f]">atletas e equipes ja confiaram nas experiencias desta plataforma.</p>
-                </div>
-                <div className="rounded-[20px] bg-[#010205] p-5 text-white">
-                  <p className="text-sm text-white/75">A partir de</p>
-                  <p className="mt-1 text-3xl font-semibold">
-                    {!cheapestModality
-                      ? 'Em breve'
-                      : Number(cheapestModality.price) === 0
-                        ? 'Gratuito'
-                        : priceFormatter.format(Number(cheapestModality.price))}
-                  </p>
-                  <p className="mt-3 text-xs text-white/70">Modalidade com melhor custo para entrada.</p>
-                </div>
-              </div>
-            </div>
-          </div>
+                    return (
+                      <article key={modality.id} className="rounded-3xl border border-black/10 bg-white p-4 text-[#0f172a] shadow-sm">
+                        <p className="text-xl font-semibold">{modality.name}</p>
+                        {modality.description && <p className="mt-1 text-sm text-[#6b7280]">{modality.description}</p>}
 
-          <div className="mt-7 flex flex-wrap items-center gap-4 text-xs text-[#70767d] sm:text-sm">
-            <span className="font-semibold text-[#010205]">Confiado por organizadores:</span>
-            <span>Track&Run</span>
-            <span>City Runners</span>
-            <span>Summit Sports</span>
-            <span>ProEvents</span>
-          </div>
-        </section>
+                        <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-[#9ca3af]">Valor</p>
+                        {pricing.discount > 0 && (
+                          <p className="text-xs text-[#9ca3af] line-through">{priceFormatter.format(pricing.base)}</p>
+                        )}
+                        <p className="text-4xl font-semibold">{price === 0 ? 'Gratuito' : priceFormatter.format(pricing.final)}</p>
 
-        <section className="mt-6 rounded-[22px] bg-white p-4 sm:p-6 lg:p-8" id="sobre">
-          <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-            <h2 className="text-3xl leading-tight sm:text-5xl">Entregue uma prova impecavel com ideias fora do padrao</h2>
-            <p className="text-sm leading-7 text-[#878c91] sm:text-base">
-              {event.description ||
-                'Da pagina de venda ao checkout da inscricao, sua corrida ganha um fluxo completo para escalar conversao e melhorar experiencia do atleta.'}
-            </p>
-          </div>
-
-          <div className="mt-6 grid gap-4 lg:grid-cols-[420px_1fr]">
-            <article className="rounded-[20px] bg-[#02060a] p-6 text-white">
-              <p className="text-5xl font-bold">920+</p>
-              <p className="mt-2 text-sm text-white/70">inscricoes processadas em experiencias similares.</p>
-              <div className="mt-7 flex items-center gap-2">
-                <div className="h-10 w-10 rounded-full border border-white/25 bg-white/10" />
-                <div className="h-10 w-10 rounded-full border border-white/25 bg-white/10" />
-                <div className="h-10 w-10 rounded-full border border-white/25 bg-white/10" />
-                <div className="h-10 w-10 rounded-full border border-white/25 bg-white/10" />
-                <span className="text-2xl">+</span>
-              </div>
-            </article>
-
-            <article className="relative overflow-hidden rounded-[20px] bg-[#dedede] p-6">
-              <img alt="Fluxo da prova" className="absolute inset-0 h-full w-full object-cover opacity-30" src={caseImage} />
-              <div className="relative flex h-full min-h-[220px] items-end justify-between">
-                <p className="text-3xl tracking-[0.2em] text-white">FLUXO DA PROVA</p>
-                <div className="grid h-14 w-14 place-content-center rounded-full bg-lime-400 text-black">
-                  <ArrowRight className="h-6 w-6" />
-                </div>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section className="mt-6 rounded-[22px] bg-[#010205] p-4 text-white sm:p-6 lg:p-8" id="modalidades">
-          <h3 className="mx-auto max-w-[760px] text-center text-3xl leading-tight sm:text-4xl">
-            Corridas reais, resultados reais para atletas e organizadores
-          </h3>
-
-          <div className="mt-5 flex flex-wrap justify-center gap-2 text-xs sm:text-sm">
-            <span className="rounded-full border border-white/20 px-4 py-1.5">Street Run</span>
-            <span className="rounded-full bg-lime-300 px-4 py-1.5 text-black">Mountain Trail</span>
-            <span className="rounded-full border border-white/20 px-4 py-1.5">Night Race</span>
-            <span className="rounded-full border border-white/20 px-4 py-1.5">Beach Run</span>
-          </div>
-
-          <div className="mt-5 grid gap-4 lg:grid-cols-3">
-            {hasModalities ? (
-              event.modalities.slice(0, 3).map((modality) => {
-                const price = Number(modality.price);
-                const pricing = buildPrice(price, event.activeBatch);
-                return (
-                  <article key={modality.id} className="rounded-[18px] bg-white/8 p-4 backdrop-blur">
-                    <p className="text-xs uppercase tracking-[0.12em] text-white/65">Modalidade</p>
-                    <h4 className="mt-1 text-xl font-semibold">{modality.name}</h4>
-                    <p className="mt-2 text-sm text-white/70">{modality.description || 'Categoria oficial do evento.'}</p>
-                    <div className="mt-4 rounded-xl bg-white p-3 text-black">
-                      {pricing.discount > 0 && (
-                        <p className="text-xs text-gray-500 line-through">{priceFormatter.format(pricing.base)}</p>
-                      )}
-                      <p className="text-2xl font-semibold">
-                        {price === 0 ? 'Gratuito' : priceFormatter.format(pricing.final)}
-                      </p>
-                    </div>
-                    <p className="mt-3 text-xs text-white/70">
-                      {modality.maxSlots
-                        ? `${Math.max(0, modality.availableSlots || 0)} de ${modality.maxSlots} vagas`
-                        : 'Vagas sem limite'}
-                    </p>
-                    <RegistrationButton
-                      eventSlug={event.slug}
-                      modalityId={modality.id}
-                      modalityName={modality.name}
-                      isDisabled={!event.isRegistrationOpen || modality.isSoldOut}
-                      disabledReason={
-                        modality.isSoldOut ? 'Esgotado' : !event.isRegistrationOpen ? 'Inscricoes Encerradas' : undefined
-                      }
-                      labelOverride="Inscrever"
-                      className="mt-3 h-10 rounded-xl"
-                    />
+                        <RegistrationButton
+                          eventSlug={event.slug}
+                          modalityId={modality.id}
+                          modalityName={modality.name}
+                          isDisabled={!event.isRegistrationOpen || modality.isSoldOut}
+                          disabledReason={
+                            modality.isSoldOut ? 'Esgotado' : !event.isRegistrationOpen ? 'Inscrições Encerradas' : undefined
+                          }
+                          labelOverride="Inscreva-se"
+                          className="mt-4 h-11 rounded-full"
+                        />
+                      </article>
+                    );
+                  })
+                ) : (
+                  <article className="md:col-span-2 rounded-2xl border border-dashed border-white/25 p-8 text-sm text-white/70">
+                    Modalidades em breve.
                   </article>
-                );
-              })
-            ) : (
-              <article className="col-span-full rounded-[18px] border border-dashed border-white/30 p-8 text-center text-white/70">
-                Modalidades em configuracao para este evento.
-              </article>
-            )}
-          </div>
-        </section>
-
-        <section className="mt-6 rounded-[22px] bg-white p-4 sm:p-6 lg:p-8">
-          <p className="text-lg leading-8 text-[#010205] sm:text-2xl">
-            "A estrutura desta landing elevou a taxa de inscricao e melhorou a percepcao do evento pelos atletas."
-          </p>
-          <div className="mt-5 flex items-center justify-between">
-            <p className="text-sm font-semibold text-[#4b4f54]">Organizacao Parceira</p>
-            <div className="flex items-center gap-2 text-sm text-[#4b4f54]">
-              <button className="rounded-full border border-[#d8d9db] p-1.5" type="button">
-                <Minus className="h-4 w-4" />
-              </button>
-              <span>1/3</span>
-              <button className="rounded-full bg-black p-1.5 text-white" type="button">
-                <Plus className="h-4 w-4" />
-              </button>
+                )}
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="mt-6 grid gap-6 rounded-[22px] bg-white p-4 sm:p-6 lg:grid-cols-[340px_1fr] lg:p-8" id="faq">
-          <div>
-            <p className="text-sm text-[#878c91]">Tudo que atleta e organizador precisam saber</p>
-            <h3 className="mt-2 text-3xl leading-tight">FAQ do evento</h3>
-            <div className="mt-5 space-y-2 text-sm">
-              <button className="rounded-full border border-black px-4 py-2" type="button">
-                Inscricoes
-              </button>
-              <button className="ml-2 rounded-full border border-[#d8d9db] px-4 py-2" type="button">
-                Contato
-              </button>
-            </div>
-          </div>
-          <div className="space-y-3">
-            {faq.map((item, index) => (
-              <details key={`${item.question}-${index}`} className="border-b border-[#e4e5e7] pb-3" open={index === 0}>
-                <summary className="cursor-pointer list-none text-sm font-semibold text-[#010205] sm:text-base">
-                  {item.question}
-                </summary>
-                <p className="mt-2 text-sm text-[#878c91]">{item.answer}</p>
-              </details>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-6 rounded-[22px] bg-white p-4 sm:p-6 lg:p-8">
-          <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-            <h3 className="text-3xl leading-tight sm:text-5xl">Conteudo e estrutura para escalar corridas</h3>
-            <div className="space-y-4 text-[#878c91]">
-              <p>
-                Landing personalizada com blocos editaveis para cada organizador, mantendo padrao visual e alto desempenho de conversao.
-              </p>
-              <button className="rounded-full border border-black px-5 py-2 text-sm font-semibold text-black" type="button">
-                Ver mais
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-4 lg:grid-cols-3">
-            {sellingPoints.slice(0, 3).map((point, index) => {
+        <main className="space-y-6 py-6">
+          <section className="grid gap-4 md:grid-cols-3">
+            {sellingPoints.map((point, index) => {
               const iconKey = typeof point.icon === 'string' ? (point.icon as LandingIconKey) : undefined;
               const fallbackIconKey = defaultSellingPoints[index % defaultSellingPoints.length].icon;
               return (
-                <article className="rounded-[16px] border border-[#ebeced] bg-[#fcfcfc] p-5" key={`${point.title}-${index}`}>
-                  <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-lime-100">
-                    <LandingIcon className="h-4 w-4 text-lime-700" iconKey={iconKey || fallbackIconKey} />
+                <article key={`${point.title}-${index}`} className="rounded-3xl border border-[#e5e7eb] bg-white p-5">
+                  <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-pink-50">
+                    <LandingIcon className="h-5 w-5 text-pink-500" iconKey={iconKey || fallbackIconKey} />
                   </div>
-                  <h4 className="text-lg font-semibold text-[#010205]">{point.title}</h4>
-                  <p className="mt-2 text-sm text-[#878c91]">{point.description}</p>
+                  <p className="text-2xl font-semibold leading-tight">{point.title}</p>
+                  <p className="mt-2 text-sm leading-6 text-[#6b7280]">{point.description}</p>
                 </article>
               );
             })}
-          </div>
-        </section>
+          </section>
 
-        <section className="mt-6 rounded-[22px] bg-[#020609] p-6 text-white sm:p-8" id="contato">
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="text-4xl leading-tight sm:text-6xl">Pronto para abrir as inscricoes?</h3>
-            <div className="flex flex-wrap gap-2">
+          <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+            <article className="rounded-3xl border border-[#e5e7eb] bg-white p-5 sm:p-6">
+              <h2 className="text-3xl font-semibold">Sobre o evento</h2>
+              <p className="mt-4 text-sm leading-7 text-[#4b5563]">{aboutDescription}</p>
+
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <div className="rounded-2xl border border-[#e5e7eb] bg-[#fafafa] p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-[#9ca3af]">Cronograma</p>
+                  <ul className="mt-3 space-y-3 text-sm text-[#374151]">
+                    <li>
+                      <span className="font-semibold text-[#111827]">Inscrições</span>
+                      <p>
+                        {regStart.toLocaleDateString('pt-BR')} até {regEnd.toLocaleDateString('pt-BR')}
+                      </p>
+                    </li>
+                    <li>
+                      <span className="font-semibold text-[#111827]">Largada</span>
+                      <p>
+                        {eventDate.toLocaleDateString('pt-BR', {
+                          weekday: 'long',
+                          day: '2-digit',
+                          month: 'long',
+                        })}
+                      </p>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="rounded-2xl border border-[#e5e7eb] bg-[#fafafa] p-4">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-[#9ca3af]">Inclui</p>
+                  <ul className="mt-3 space-y-2 text-sm text-[#374151]">
+                    {includes.map((item, index) => (
+                      <li key={`${item}-${index}`}>• {item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </article>
+
+            <article className="rounded-3xl border border-[#e5e7eb] bg-white p-5 sm:p-6">
+              <h2 className="text-3xl font-semibold">Localização</h2>
+              <p className="mt-2 text-sm text-[#6b7280]">Garanta tempo para chegar com tranquilidade e aproveite o ambiente pré-prova.</p>
+
+              <div className="mt-4 rounded-2xl bg-[#f3f4f6] p-4">
+                <p className="inline-flex items-center gap-2 text-sm font-semibold text-[#111827]">
+                  <MapPin className="h-4 w-4" />
+                  {event.location ? event.location.city : 'Local a definir'}
+                </p>
+                <p className="text-xs text-[#6b7280]">{event.location ? event.location.state : ''}</p>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-[#e5e7eb] bg-[#fafafa] p-4">
+                <p className="text-sm font-semibold text-[#111827]">Dicas rápidas</p>
+                <ul className="mt-2 space-y-2 text-sm text-[#4b5563]">
+                  {tips.map((tip, index) => (
+                    <li key={`${tip}-${index}`}>• {tip}</li>
+                  ))}
+                </ul>
+              </div>
+            </article>
+          </section>
+
+          <section className="rounded-3xl bg-white p-5 sm:p-6">
+            <p className="text-xs uppercase tracking-[0.18em] text-[#9ca3af]">FAQ</p>
+            <h2 className="mt-2 text-4xl font-semibold">Dúvidas frequentes</h2>
+            <div className="mt-5 space-y-3">
+              {faq.map((item, index) => (
+                <details key={`${item.question}-${index}`} className="rounded-2xl border border-[#e5e7eb] bg-[#fafafa] p-4" open={index === 0}>
+                  <summary className="cursor-pointer text-lg font-semibold text-[#111827]">{item.question}</summary>
+                  <p className="mt-2 text-sm text-[#6b7280]">{item.answer}</p>
+                </details>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-dashed border-[#d1d5db] bg-white px-6 py-10 text-center">
+            <p className="text-xs uppercase tracking-[0.2em] text-[#9ca3af]">Precisa de ajuda?</p>
+            <h3 className="mt-2 text-4xl font-semibold">Fale com nossa equipe</h3>
+            <p className="mt-2 text-sm text-[#6b7280]">Tire dúvidas sobre modalidades, pagamentos ou suporte no dia da prova.</p>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
               <a
-                className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-5 text-sm font-semibold text-black"
+                className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0b0d10] px-5 text-sm font-semibold text-white"
                 href={`mailto:${supportEmail}?subject=Ajuda%20com%20inscricao`}
               >
                 <Mail className="h-4 w-4" />
-                Contato
+                Enviar e-mail
               </a>
               {whatsappLink && (
                 <a
-                  className="inline-flex h-11 items-center gap-2 rounded-full border border-white/35 px-5 text-sm font-semibold"
+                  className="inline-flex h-11 items-center gap-2 rounded-full border border-[#0b0d10] px-5 text-sm font-semibold text-[#0b0d10]"
                   href={whatsappLink}
                   rel="noreferrer"
                   target="_blank"
@@ -506,43 +433,11 @@ export default async function EventPublicPage({ params }: EventPageProps) {
                 </a>
               )}
             </div>
-          </div>
-        </section>
+          </section>
+        </main>
 
-        <footer className="mt-6 rounded-[22px] bg-white p-4 sm:p-6">
-          <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr_1fr_1fr]">
-            <div>
-              <p className="text-xl font-bold">OKE SPORTS</p>
-              <p className="mt-3 text-sm text-[#878c91]">
-                White-label para corridas com visual premium, SEO e fluxo orientado a inscricao.
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-[#010205]">Navegacao</p>
-              <ul className="mt-3 space-y-2 text-sm text-[#878c91]">
-                <li>Sobre</li>
-                <li>Modalidades</li>
-                <li>FAQ</li>
-                <li>Contato</li>
-              </ul>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-[#010205]">Politicas</p>
-              <ul className="mt-3 space-y-2 text-sm text-[#878c91]">
-                <li>Privacidade</li>
-                <li>Termos</li>
-                <li>Suporte</li>
-              </ul>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-[#010205]">Datas do Evento</p>
-              <ul className="mt-3 space-y-2 text-sm text-[#878c91]">
-                <li>{regStart.toLocaleDateString('pt-BR')}</li>
-                <li>{regEnd.toLocaleDateString('pt-BR')}</li>
-                <li>{eventDate.toLocaleDateString('pt-BR')}</li>
-              </ul>
-            </div>
-          </div>
+        <footer className="border-t border-[#e5e7eb] px-2 py-5 text-center text-sm text-[#6b7280]">
+          Powered by Okê Sports • Faça sua prova acontecer.
         </footer>
       </div>
     </div>
