@@ -319,6 +319,7 @@ export default async function EventPublicPage({ params }: EventPageProps) {
           </div>
         </section>
 
+        <div className="mx-auto max-w-7xl">
         <main className="space-y-6 py-6">
           <section className="grid gap-4 md:grid-cols-3">
             {sellingPoints.map((point, index) => {
@@ -441,6 +442,7 @@ export default async function EventPublicPage({ params }: EventPageProps) {
         <footer className="border-t border-[#e5e7eb] px-2 py-5 text-center text-sm text-[#6b7280]">
           Powered by Okê Sports • Faça sua prova acontecer.
         </footer>
+        </div>
       </div>
     </div>
   );
