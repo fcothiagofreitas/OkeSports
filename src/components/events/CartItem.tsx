@@ -1,8 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Edit, X } from 'lucide-react';
+import { Pencil, X, User } from 'lucide-react';
 import type { CartParticipant } from '@/hooks/useCart';
 
 interface CartItemProps {
@@ -14,66 +13,61 @@ interface CartItemProps {
 }
 
 export function CartItem({ participant, isEditable = true, onEdit, onRemove, showRemove = true }: CartItemProps) {
+  const isSelf = participant.id === 'self';
+
   return (
-    <Card className="border-neutral-light-gray">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <h4 className="font-bold text-neutral-charcoal">{participant.fullName}</h4>
-              {participant.id === 'self' && (
-                <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full font-medium">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex gap-3">
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100">
+            <User className="h-4 w-4 text-slate-500" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-slate-900">{participant.fullName}</p>
+              {isSelf && (
+                <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-600">
                   Você
                 </span>
               )}
             </div>
-            <div className="space-y-1 text-sm text-neutral-gray">
-              <p>
-                <span className="font-medium">CPF:</span>{' '}
-                {participant.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')}
-              </p>
-              <p>
-                <span className="font-medium">Email:</span> {participant.email}
-              </p>
-              {participant.phone && (
-                <p>
-                  <span className="font-medium">Telefone:</span> {participant.phone}
-                </p>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
+              <span>{participant.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')}</span>
+              <span>{participant.email}</span>
+              {participant.shirtSize && <span>Camiseta: {participant.shirtSize}</span>}
+              {!participant.shirtSize && (
+                <span className="italic text-amber-500">Camiseta pendente</span>
               )}
-              <p>
-                <span className="font-medium">Camiseta:</span>{' '}
-                {participant.shirtSize || <span className="text-neutral-gray italic">Não informado</span>}
-              </p>
             </div>
           </div>
-          {isEditable && (
-            <div className="flex gap-2">
-              {onEdit && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={onEdit}
-                  className="h-8 w-8 p-0"
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-              )}
-              {showRemove && onRemove && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={onRemove}
-                  className="h-8 w-8 p-0 text-accent-danger hover:text-accent-danger hover:bg-accent-danger/10"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          )}
         </div>
-      </CardContent>
-    </Card>
+        {isEditable && (
+          <div className="flex items-center gap-1">
+            {onEdit && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onEdit}
+                className="h-8 w-8 p-0 text-slate-400 hover:text-slate-600"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {showRemove && onRemove && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onRemove}
+                className="h-8 w-8 p-0 text-slate-400 hover:text-red-500"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

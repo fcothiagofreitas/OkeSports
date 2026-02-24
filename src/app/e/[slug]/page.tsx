@@ -1,7 +1,5 @@
 import { notFound } from 'next/navigation';
-import { Calendar, MapPin, Users, DollarSign, ArrowRight, Share2, AlertTriangle } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Calendar, MapPin, Mail, MessageCircle, Clock, ChevronRight, Users, CheckCircle } from 'lucide-react';
 import { RegistrationButton } from '@/components/events/RegistrationButton';
 import { LandingIcon } from '@/components/events/LandingIcon';
 import type { LandingIconKey } from '@/constants/landingIcons';
@@ -17,82 +15,80 @@ interface EventPageProps {
   }>;
 }
 
+interface LandingSellingPoint {
+  icon?: string;
+  title: string;
+  description: string;
+}
+
+interface LandingAbout {
+  description?: string;
+  includes?: string[];
+  tips?: string[];
+}
+
+interface LandingFaq {
+  question: string;
+  answer: string;
+}
+
+function isLandingSellingPoint(value: unknown): value is LandingSellingPoint {
+  if (!value || typeof value !== 'object') return false;
+  const point = value as Record<string, unknown>;
+  return typeof point.title === 'string' && typeof point.description === 'string';
+}
+
+function isLandingFaq(value: unknown): value is LandingFaq {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as Record<string, unknown>;
+  return typeof item.question === 'string' && typeof item.answer === 'string';
+}
+
 async function getEvent(slug: string) {
   try {
-    // Buscar evento público diretamente do banco
     const event = await prisma.event.findFirst({
-      where: {
-        slug,
-        status: 'PUBLISHED', // Apenas eventos publicados
-      },
+      where: { slug, status: 'PUBLISHED' },
       include: {
         location: true,
         modalities: {
-          where: {
-            active: true, // Apenas modalidades ativas
-          },
-          orderBy: {
-            price: 'asc',
-          },
+          where: { active: true },
+          orderBy: { price: 'asc' },
           include: {
-            _count: {
-              select: {
-                registrations: true,
-              },
-            },
+            _count: { select: { registrations: true } },
           },
         },
         kit: {
           include: {
             sizes: {
-              orderBy: {
-                size: 'asc',
-              },
+              orderBy: { size: 'asc' },
             },
           },
         },
-        _count: {
-          select: {
-            registrations: true,
-          },
-        },
+        _count: { select: { registrations: true } },
       },
     });
 
-    if (!event) {
-      return null;
-    }
+    if (!event) return null;
 
-    // Calcular vagas disponíveis por modalidade
     const modalitiesWithAvailability = event.modalities.map((modality) => ({
       ...modality,
-      availableSlots: modality.maxSlots
-        ? modality.maxSlots - modality._count.registrations
-        : null, // null = ilimitado
-      isSoldOut: modality.maxSlots
-        ? modality._count.registrations >= modality.maxSlots
-        : false,
+      availableSlots: modality.maxSlots ? modality.maxSlots - modality._count.registrations : null,
+      isSoldOut: modality.maxSlots ? modality._count.registrations >= modality.maxSlots : false,
     }));
 
-    // Verificar se evento está com inscrições abertas
     const now = new Date();
-    const isRegistrationOpen =
-      now >= event.registrationStart && now <= event.registrationEnd;
+    const isRegistrationOpen = now >= event.registrationStart && now <= event.registrationEnd;
 
-    // Buscar lote ativo
     const activeBatch = await getActiveBatch(event.id);
     const activeBatchInfo = activeBatch
       ? {
           id: activeBatch.id,
           name: activeBatch.name,
           discountType: activeBatch.discountType,
-          discountValue: activeBatch.discountValue
-            ? Number(activeBatch.discountValue)
-            : null,
+          discountValue: activeBatch.discountValue ? Number(activeBatch.discountValue) : null,
         }
       : null;
 
-    // Retornar dados formatados
     return {
       id: event.id,
       slug: event.slug,
@@ -104,37 +100,17 @@ async function getEvent(slug: string) {
       registrationEnd: event.registrationEnd,
       location: event.location,
       bannerUrl: event.bannerUrl,
-      logoUrl: event.logoUrl,
       coverUrl: event.coverUrl,
-      maxRegistrations: event.maxRegistrations,
-      allowGroupReg: event.allowGroupReg,
-      maxGroupSize: event.maxGroupSize,
       modalities: modalitiesWithAvailability,
       totalRegistrations: event._count.registrations,
       isRegistrationOpen,
-      status: event.status,
       landingSellingPoints: event.landingSellingPoints,
       landingAbout: event.landingAbout,
       landingFaq: event.landingFaq,
       supportEmail: event.supportEmail,
       supportWhatsapp: event.supportWhatsapp,
       activeBatch: activeBatchInfo,
-      kit: event.kit
-        ? {
-            includeShirt: event.kit.includeShirt,
-            shirtRequired: event.kit.shirtRequired,
-            items: event.kit.items,
-            availableSizes: event.kit.sizes
-              .filter((size) => {
-                const available = size.stock - size.reserved - size.sold;
-                return available > 0;
-              })
-              .map((size) => ({
-                size: size.size,
-                available: size.stock - size.reserved - size.sold,
-              })),
-          }
-        : null,
+      kit: event.kit,
     };
   } catch (error) {
     console.error('Error fetching event:', error);
@@ -142,33 +118,38 @@ async function getEvent(slug: string) {
   }
 }
 
+function buildPrice(price: number, activeBatch: { discountType: string | null; discountValue: number | null } | null) {
+  if (!activeBatch?.discountType || !activeBatch.discountValue) {
+    return { base: price, discount: 0, final: price };
+  }
+
+  const discount =
+    activeBatch.discountType === 'PERCENTAGE'
+      ? (price * activeBatch.discountValue) / 100
+      : Math.min(activeBatch.discountValue, price);
+
+  return {
+    base: price,
+    discount,
+    final: Math.max(0, price - discount),
+  };
+}
+
 export default async function EventPublicPage({ params }: EventPageProps) {
   const { slug } = await params;
   const event = await getEvent(slug);
 
-  if (!event) {
-    notFound();
-  }
+  if (!event) notFound();
 
   const eventDate = new Date(event.eventDate);
   const regStart = new Date(event.registrationStart);
   const regEnd = new Date(event.registrationEnd);
-  const today = new Date();
-  const daysToEvent = Math.max(0, Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
-  const daysToClose = Math.max(0, Math.ceil((regEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
-  const hasModalities = event.modalities.length > 0;
-  const cheapestModality = hasModalities
-    ? event.modalities.reduce((prev: any, curr: any) => (curr.price < prev.price ? curr : prev), event.modalities[0])
-    : null;
+  const now = new Date();
+  const dayMs = 1000 * 60 * 60 * 24;
+
+  const daysToEvent = Math.max(0, Math.ceil((eventDate.getTime() - now.getTime()) / dayMs));
+
   const priceFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-  const priceLabel = cheapestModality
-    ? cheapestModality.price === 0
-      ? 'Gratuito'
-      : priceFormatter.format(cheapestModality.price)
-    : 'Inscrições em breve';
-  const publicUrl =
-    (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '') + `/e/${event.slug}`;
-  const heroModalities = event.modalities;
 
   const defaultSellingPoints = [
     {
@@ -188,378 +169,344 @@ export default async function EventPublicPage({ params }: EventPageProps) {
     },
   ];
 
-  const hasCustomSellingPoints = Array.isArray(event.landingSellingPoints);
-  const sellingPoints = hasCustomSellingPoints ? event.landingSellingPoints : defaultSellingPoints;
-  const showSellingPoints = hasCustomSellingPoints ? sellingPoints.length > 0 : true;
+  const customSellingPoints: LandingSellingPoint[] = Array.isArray(event.landingSellingPoints)
+    ? (event.landingSellingPoints.filter(isLandingSellingPoint) as unknown as LandingSellingPoint[])
+    : [];
+  const sellingPoints = customSellingPoints.length > 0 ? customSellingPoints : defaultSellingPoints;
 
-  const landingAbout = event.landingAbout || {};
+  const landingAbout: LandingAbout =
+    event.landingAbout && typeof event.landingAbout === 'object' && !Array.isArray(event.landingAbout)
+      ? (event.landingAbout as LandingAbout)
+      : {};
+
   const aboutDescription =
-    landingAbout.description !== undefined ? landingAbout.description : event.description;
+    landingAbout.description || event.description || event.shortDescription || 'Descrição do evento em breve.';
 
-  const defaultIncludes = [
-    'Camiseta oficial e número de peito',
-    'Hidratação e suporte médico',
-    'Medalha finisher exclusiva',
-    'Fotos oficiais (quando disponíveis)',
+  const includesFromLanding = Array.isArray(landingAbout.includes) ? landingAbout.includes : [];
+  const includesFromKit = Array.isArray(event.kit?.items)
+    ? event.kit.items
+        .filter((item): item is { name: string } => !!item && typeof item === 'object' && typeof (item as { name?: unknown }).name === 'string')
+        .map((item) => item.name)
+    : [];
+  const includes =
+    includesFromLanding.length > 0
+      ? includesFromLanding
+      : includesFromKit.length > 0
+        ? includesFromKit
+        : ['Camiseta oficial e número de peito', 'Hidratação e suporte médico', 'Medalha finisher exclusiva'];
+
+  const tips =
+    Array.isArray(landingAbout.tips) && landingAbout.tips.length > 0
+      ? landingAbout.tips
+      : [
+          'Chegue com pelo menos 1h de antecedência.',
+          'Opte por transporte compartilhado para evitar bloqueios.',
+          'Siga as orientações de staff e placas de acesso.',
+        ];
+
+  const defaultFaq: LandingFaq[] = [
+    {
+      question: 'Como funciona a retirada de kits?',
+      answer: 'Você receberá as informações por e-mail após confirmação da inscrição.',
+    },
+    {
+      question: 'Posso transferir minha inscrição?',
+      answer: 'Sim, respeitando as regras e prazos definidos pela organização.',
+    },
+    {
+      question: 'Quais são as formas de pagamento?',
+      answer: 'As formas disponíveis aparecem no checkout da inscrição.',
+    },
   ];
-  const hasCustomIncludes = Array.isArray(landingAbout.includes);
-  const includesList = hasCustomIncludes ? landingAbout.includes : defaultIncludes;
-  const showIncludes = hasCustomIncludes ? includesList.length > 0 : true;
 
-  const defaultTips = [
-    'Chegue com pelo menos 1h de antecedência.',
-    'Opte por transporte compartilhado para evitar bloqueios.',
-    'Siga as orientações de staff e placas de acesso.',
-  ];
-  const hasCustomTips = Array.isArray(landingAbout.tips);
-  const tipsList = hasCustomTips ? landingAbout.tips : defaultTips;
-  const showTips = hasCustomTips ? tipsList.length > 0 : true;
+  const customFaq: LandingFaq[] = Array.isArray(event.landingFaq)
+    ? (event.landingFaq.filter(isLandingFaq) as unknown as LandingFaq[])
+    : [];
+  const faq = customFaq.length > 0 ? customFaq : defaultFaq;
 
-  const hasCustomFaq = Array.isArray(event.landingFaq);
-  const faq = hasCustomFaq
-    ? event.landingFaq
-    : [
-        {
-          question: 'Como funciona a retirada de kits?',
-          answer: 'Você receberá o e-mail com local e horários assim que a inscrição for confirmada.',
-        },
-        {
-          question: 'Posso transferir minha inscrição?',
-          answer: 'Sim, até 7 dias antes do evento. Solicite via suporte do organizador.',
-        },
-        {
-          question: 'Quais são as formas de pagamento?',
-          answer: 'Cartão de crédito, PIX e boleto (quando disponível).',
-        },
-      ];
-  const showFaq = hasCustomFaq ? faq.length > 0 : true;
+  const heroImage =
+    event.coverUrl ||
+    event.bannerUrl ||
+    'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1600&q=80';
 
   const supportEmail = event.supportEmail || 'contato@okesports.com';
-  const supportWhatsapp = event.supportWhatsapp;
+  const supportWhatsapp = event.supportWhatsapp || undefined;
   const whatsappLink = supportWhatsapp ? `https://wa.me/${supportWhatsapp.replace(/\D/g, '')}` : null;
 
   return (
-    <div className="min-h-screen bg-[hsl(var(--gray-50))]">
-      <nav className="bg-white/80 backdrop-blur border-b border-[hsl(var(--gray-200))] sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-[hsl(var(--accent-pink))] font-sans">🏃 Okê Sports</h1>
-          <div className="hidden md:flex items-center gap-6 text-sm text-[hsl(var(--gray-600))]">
-            <span>{event.location ? `${event.location.city}, ${event.location.state}` : 'Evento esportivo'}</span>
-            <span>{eventDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}</span>
-          </div>
-        </div>
-      </nav>
-
-      <header className="relative isolate overflow-hidden bg-gradient-to-b from-[hsl(var(--dark))] via-[hsl(var(--dark))]/90 to-white text-white">
-        <div className="absolute inset-0 opacity-40">
-          {(event.coverUrl || event.bannerUrl) && (
-            <img src={event.coverUrl || event.bannerUrl} alt={event.name} className="w-full h-full object-cover" />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-b from-black via-black/70 to-transparent" />
-        </div>
-
-        <div className="relative max-w-7xl mx-auto px-6 lg:px-10 py-16 space-y-8">
-          <div className="flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-[0.3em] text-white">
-            <Badge variant="secondary" className="bg-white/10 border-white/25 text-white rounded-xl px-4 py-2">
-              {eventDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
-            </Badge>
+    <div className="min-h-screen bg-[#f5f5f7]">
+      {/* Navbar */}
+      <header className="sticky top-0 z-50 border-b border-black/[0.04] bg-white/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
+          <p className="text-sm font-bold tracking-wide text-slate-900">OKE SPORTS</p>
+          <div className="hidden items-center gap-5 text-[13px] text-slate-500 md:flex">
             {event.location && (
-              <Badge variant="secondary" className="bg-white/10 border-white/25 text-white rounded-xl px-4 py-2">
+              <span className="flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5" />
                 {event.location.city}, {event.location.state}
-              </Badge>
+              </span>
             )}
-            <Badge variant="secondary" className="bg-white/10 border-white/25 text-white rounded-xl px-4 py-2">
-              Faltam {daysToEvent} dia{daysToEvent === 1 ? '' : 's'}
-            </Badge>
-            <Badge
-              variant="secondary"
-              className={
-                event.isRegistrationOpen
-                  ? 'bg-emerald-500 text-white border-emerald-400 rounded-xl px-4 py-2'
-                  : 'bg-white/10 text-white rounded-xl px-4 py-2'
-              }
-            >
-              {event.isRegistrationOpen ? 'Inscrições abertas' : 'Inscrições encerradas'}
-            </Badge>
+            <span className="flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5" />
+              {eventDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+            </span>
           </div>
-
-          <div className="py-8">
-            <h1 className="text-4xl lg:text-5xl font-bold leading-tight mb-2">{event.name}</h1>
-            {event.shortDescription && <p className="text-lg text-white/80 max-w-3xl">{event.shortDescription}</p>}
-          </div>
-
-          {heroModalities.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {heroModalities.map((modality: any) => {
-                // Calcular preço com lote ativo
-                let displayPrice = modality.price;
-                let batchDiscount = 0;
-                if (event.activeBatch && event.activeBatch.discountType && event.activeBatch.discountValue) {
-                  if (event.activeBatch.discountType === 'PERCENTAGE') {
-                    batchDiscount = (modality.price * event.activeBatch.discountValue) / 100;
-                  } else {
-                    batchDiscount = Math.min(event.activeBatch.discountValue, modality.price);
-                  }
-                  displayPrice = modality.price - batchDiscount;
-                }
-
-                return (
-                  <div
-                    key={modality.id}
-                    className="rounded-3xl bg-white text-[hsl(var(--dark))] shadow-lg border border-[hsl(var(--gray-200))] p-6 space-y-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xl font-semibold">{modality.name}</p>
-                        {modality.description && (
-                          <p className="text-sm text-[hsl(var(--gray-600))] mt-1">{modality.description}</p>
-                        )}
-                      </div>
-                      {modality.isSoldOut ? (
-                        <Badge variant="secondary">Esgotado</Badge>
-                      ) : modality.price === 0 ? (
-                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-100">
-                          Gratuita
-                        </Badge>
-                      ) : null}
-                    </div>
-                    {event.activeBatch && batchDiscount > 0 && (
-                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2">
-                        <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">
-                          {event.activeBatch.name}
-                        </p>
-                        <p className="text-xs text-emerald-600 mt-1">
-                          {event.activeBatch.discountType === 'PERCENTAGE'
-                            ? `${event.activeBatch.discountValue}% OFF`
-                            : `${priceFormatter.format(event.activeBatch.discountValue)} OFF`}
-                        </p>
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-[hsl(var(--gray-500))] mb-1">Valor</p>
-                      {batchDiscount > 0 ? (
-                        <div>
-                          <p className="text-sm text-[hsl(var(--gray-500))] line-through">
-                            {priceFormatter.format(modality.price)}
-                          </p>
-                          <p className="text-2xl font-bold text-emerald-600">
-                            {priceFormatter.format(displayPrice)}
-                          </p>
-                        </div>
-                      ) : (
-                        <p className="text-2xl font-bold">
-                          {modality.price === 0 ? 'Gratuito' : priceFormatter.format(modality.price)}
-                        </p>
-                      )}
-                    </div>
-                  {modality.maxSlots && (
-                    <p className="text-xs text-[hsl(var(--gray-500))]">
-                      {modality.availableSlots} de {modality.maxSlots} vagas
-                    </p>
-                  )}
-                  <RegistrationButton
-                    eventSlug={event.slug}
-                    modalityId={modality.id}
-                    modalityName={modality.name}
-                    isDisabled={!event.isRegistrationOpen || modality.isSoldOut}
-                    disabledReason={
-                      modality.isSoldOut ? 'Esgotado' : !event.isRegistrationOpen ? 'Inscrições Encerradas' : undefined
-                    }
-                    labelOverride={event.isRegistrationOpen ? 'Inscreva-se' : undefined}
-                    className="mt-4"
-                  />
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 lg:px-10 py-12 space-y-16">
-        {showSellingPoints && (
-          <section className="grid gap-6 md:grid-cols-3">
-            {sellingPoints.map((point: any, index: number) => {
-              const iconKey = typeof point.icon === 'string' ? (point.icon as LandingIconKey) : undefined;
-              const fallbackIconKey = defaultSellingPoints[index % defaultSellingPoints.length].icon;
-              return (
-                <Card key={point.title} className="border-[hsl(var(--gray-200))] shadow-sm rounded-3xl">
-                  <CardContent className="pt-6">
-                    <div className="h-12 w-12 rounded-full bg-[hsl(var(--accent-pink))]/10 flex items-center justify-center mb-4">
-                      <LandingIcon
-                        iconKey={iconKey || fallbackIconKey}
-                        className="h-6 w-6 text-[hsl(var(--accent-pink))]"
-                      />
-                    </div>
-                    <h3 className="text-lg font-semibold text-[hsl(var(--dark))] mb-2">{point.title}</h3>
-                    <p className="text-[hsl(var(--gray-600))] text-sm">{point.description}</p>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </section>
-        )}
+      {/* Hero — full width */}
+      <section className="relative overflow-hidden bg-slate-900">
+          <div className="absolute inset-0">
+            <img
+              alt={event.name}
+              className="h-full w-full object-cover opacity-40"
+              src={heroImage}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/80 to-slate-900/40" />
+          </div>
 
-        <section className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-          <Card className="shadow-sm border-[hsl(var(--gray-200))] rounded-3xl">
-            <CardHeader>
-              <CardTitle>Sobre o evento</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6 text-[hsl(var(--gray-700))]">
-              <p className="whitespace-pre-wrap leading-relaxed">{aboutDescription}</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="rounded-2xl border border-[hsl(var(--gray-200))] p-4">
-                  <p className="text-xs uppercase tracking-[0.3em] text-[hsl(var(--gray-500))] mb-2">
-                    Cronograma
-                  </p>
-                  <ul className="space-y-3 text-sm">
-                    <li>
-                      <span className="font-semibold text-[hsl(var(--dark))]">Inscrições</span>
-                      <p className="text-[hsl(var(--gray-600))]">
-                        {regStart.toLocaleDateString('pt-BR')} até {regEnd.toLocaleDateString('pt-BR')}
-                      </p>
-                    </li>
-                    <li>
-                      <span className="font-semibold text-[hsl(var(--dark))]">Retirada de kit</span>
-                      <p className="text-[hsl(var(--gray-600))]">Informações enviadas por e-mail após confirmação.</p>
-                    </li>
-                    <li>
-                      <span className="font-semibold text-[hsl(var(--dark))]">Largada</span>
-                      <p className="text-[hsl(var(--gray-600))]">
-                        {eventDate.toLocaleDateString('pt-BR', {
-                          weekday: 'long',
-                          day: '2-digit',
-                          month: 'long',
-                        })}
-                      </p>
-                    </li>
-                  </ul>
-                </div>
-                {showIncludes && (
-                  <div className="rounded-2xl border border-[hsl(var(--gray-200))] p-4">
-                    <p className="text-xs uppercase tracking-[0.3em] text-[hsl(var(--gray-500))] mb-2">Inclui</p>
-                    <ul className="space-y-2 text-sm text-[hsl(var(--gray-600))]">
-                      {includesList.map((item: string, index: number) => (
-                        <li key={`${item}-${index}`}>• {item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-sm border-[hsl(var(--gray-200))] rounded-3xl">
-            <CardHeader>
-              <CardTitle>Localização</CardTitle>
-              <CardDescription>
-                Garanta tempo para chegar com tranquilidade e aproveite o ambiente pré-prova.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-2xl bg-[hsl(var(--gray-100))] border border-[hsl(var(--gray-200))] p-4 text-sm">
-                {event.location ? (
-                  <>
-                    <p className="font-semibold text-[hsl(var(--dark))]">{event.location.city}</p>
-                    <p className="text-[hsl(var(--gray-600))]">{event.location.state}</p>
-                  </>
-                ) : (
-                  <p className="text-[hsl(var(--gray-500))]">Local a ser divulgado em breve.</p>
-                )}
-              </div>
-              {showTips && (
-                <div className="rounded-2xl border border-[hsl(var(--gray-200))] p-4 bg-white space-y-3 text-sm text-[hsl(var(--gray-600))]">
-                  <p className="font-semibold text-[hsl(var(--dark))]">Dicas rápidas</p>
-                  {tipsList.map((tip: string, index: number) => (
-                    <p key={`${tip}-${index}`}>• {tip}</p>
-                  ))}
-                </div>
+          <div className="relative mx-auto max-w-7xl px-6 pb-8 pt-10 sm:px-10 sm:pb-10 sm:pt-14 lg:px-14 lg:pt-16">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-medium sm:text-xs">
+              <span className="rounded-full bg-white/10 px-3 py-1.5 uppercase tracking-widest text-white/80 backdrop-blur-sm">
+                {eventDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </span>
+              {event.location && (
+                <span className="rounded-full bg-white/10 px-3 py-1.5 uppercase tracking-widest text-white/80 backdrop-blur-sm">
+                  {event.location.city}, {event.location.state}
+                </span>
               )}
-            </CardContent>
-          </Card>
+              <span className="rounded-full bg-white/10 px-3 py-1.5 uppercase tracking-widest text-white/80 backdrop-blur-sm">
+                {daysToEvent > 0 ? `Faltam ${daysToEvent} dias` : 'Hoje!'}
+              </span>
+              <span
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-widest ${
+                  event.isRegistrationOpen
+                    ? 'bg-emerald-500/90 text-white'
+                    : 'bg-white/10 text-white/70 backdrop-blur-sm'
+                }`}
+              >
+                {event.isRegistrationOpen ? 'Inscrições abertas' : 'Inscrições encerradas'}
+              </span>
+            </div>
+
+            <h1 className="mt-6 text-3xl font-bold tracking-tight text-white sm:text-5xl lg:text-6xl">
+              {event.name}
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/70 sm:text-base sm:leading-7">
+              {aboutDescription}
+            </p>
+
+            {/* Modality Cards */}
+            <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {event.modalities.length > 0 ? (
+                event.modalities.map((modality) => {
+                  const price = Number(modality.price);
+                  const pricing = buildPrice(price, event.activeBatch);
+
+                  return (
+                    <article
+                      key={modality.id}
+                      className="rounded-xl border border-white/[0.08] bg-white/[0.06] p-5 backdrop-blur-md transition-colors hover:bg-white/[0.1]"
+                    >
+                      <p className="text-lg font-semibold text-white">{modality.name}</p>
+                      {modality.description && (
+                        <p className="mt-0.5 text-sm text-white/50">{modality.description}</p>
+                      )}
+
+                      <div className="mt-4">
+                        <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-white/40">Valor</p>
+                        {pricing.discount > 0 && (
+                          <p className="mt-0.5 text-xs text-white/40 line-through">
+                            {priceFormatter.format(pricing.base)}
+                          </p>
+                        )}
+                        <p className="text-3xl font-bold tracking-tight text-white">
+                          {price === 0 ? 'Gratuito' : priceFormatter.format(pricing.final)}
+                        </p>
+                      </div>
+
+                      <RegistrationButton
+                        eventSlug={event.slug}
+                        modalityId={modality.id}
+                        modalityName={modality.name}
+                        isDisabled={!event.isRegistrationOpen || modality.isSoldOut}
+                        disabledReason={
+                          modality.isSoldOut ? 'Esgotado' : !event.isRegistrationOpen ? 'Inscrições Encerradas' : undefined
+                        }
+                        labelOverride="Inscreva-se"
+                        className="mt-4 h-10 rounded-lg bg-white font-semibold text-slate-900 hover:bg-white/90"
+                      />
+                    </article>
+                  );
+                })
+              ) : (
+                <article className="col-span-full rounded-xl border border-dashed border-white/20 p-8 text-center text-sm text-white/50">
+                  Modalidades em breve.
+                </article>
+              )}
+            </div>
+          </div>
+      </section>
+
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+        {/* Selling Points */}
+        <section className="mt-6 grid gap-3 md:grid-cols-3">
+          {sellingPoints.map((point, index) => {
+            const iconKey = typeof point.icon === 'string' ? (point.icon as LandingIconKey) : undefined;
+            const fallbackIconKey = defaultSellingPoints[index % defaultSellingPoints.length].icon;
+            return (
+              <article
+                key={`${point.title}-${index}`}
+                className="rounded-2xl border border-black/[0.04] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]"
+              >
+                <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50">
+                  <LandingIcon className="h-5 w-5 text-emerald-600" iconKey={iconKey || fallbackIconKey} />
+                </div>
+                <p className="text-base font-semibold text-slate-900">{point.title}</p>
+                <p className="mt-1 text-sm leading-relaxed text-slate-500">{point.description}</p>
+              </article>
+            );
+          })}
         </section>
 
-        {event.isRegistrationOpen && daysToClose <= 3 && (
-          <div className="rounded-3xl border border-amber-200 bg-amber-50 px-6 py-5 flex flex-wrap gap-3 items-center text-amber-900 shadow-sm">
-            <AlertTriangle className="h-5 w-5" />
-            Restam apenas {daysToClose} dia{daysToClose === 1 ? '' : 's'} para encerrar as inscrições. Garanta sua vaga!
-            {cheapestModality && (
-              <RegistrationButton
-                eventSlug={event.slug}
-                modalityId={cheapestModality.id}
-                modalityName={cheapestModality.name}
-                isDisabled={false}
-                className="ml-auto px-6"
-              />
-            )}
+        {/* About + Location */}
+        <section className="mt-6 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <article className="rounded-2xl border border-black/[0.04] bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+            <h2 className="text-xl font-bold text-slate-900">Sobre o evento</h2>
+            <p className="mt-3 text-sm leading-7 text-slate-500">{aboutDescription}</p>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl bg-slate-50 p-4">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-slate-400" />
+                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Cronograma</p>
+                </div>
+                <ul className="mt-3 space-y-3 text-sm text-slate-600">
+                  <li>
+                    <span className="font-medium text-slate-900">Inscrições</span>
+                    <p className="text-slate-500">
+                      {regStart.toLocaleDateString('pt-BR')} até {regEnd.toLocaleDateString('pt-BR')}
+                    </p>
+                  </li>
+                  <li>
+                    <span className="font-medium text-slate-900">Largada</span>
+                    <p className="text-slate-500">
+                      {eventDate.toLocaleDateString('pt-BR', {
+                        weekday: 'long',
+                        day: '2-digit',
+                        month: 'long',
+                      })}
+                    </p>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 p-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-slate-400" />
+                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Inclui</p>
+                </div>
+                <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                  {includes.map((item, index) => (
+                    <li key={`${item}-${index}`} className="flex items-start gap-2">
+                      <ChevronRight className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-emerald-500" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-black/[0.04] bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+            <h2 className="text-xl font-bold text-slate-900">Localização</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Garanta tempo para chegar com tranquilidade.
+            </p>
+
+            <div className="mt-4 rounded-xl bg-slate-50 p-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-200/70">
+                  <MapPin className="h-4 w-4 text-slate-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {event.location ? event.location.city : 'Local a definir'}
+                  </p>
+                  <p className="text-xs text-slate-500">{event.location ? event.location.state : ''}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 rounded-xl bg-slate-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Dicas rápidas</p>
+              <ul className="mt-3 space-y-2.5 text-sm text-slate-600">
+                {tips.map((tip, index) => (
+                  <li key={`${tip}-${index}`} className="flex items-start gap-2">
+                    <span className="mt-1 block h-1.5 w-1.5 flex-shrink-0 rounded-full bg-slate-300" />
+                    <span>{tip}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </article>
+        </section>
+
+        {/* FAQ */}
+        <section className="mt-6 rounded-2xl border border-black/[0.04] bg-white p-6 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">FAQ</p>
+          <h2 className="mt-1 text-xl font-bold text-slate-900">Dúvidas frequentes</h2>
+          <div className="mt-5 space-y-2">
+            {faq.map((item, index) => (
+              <details
+                key={`${item.question}-${index}`}
+                className="group rounded-xl bg-slate-50 transition-colors open:bg-slate-100/80"
+                open={index === 0}
+              >
+                <summary className="flex cursor-pointer items-center justify-between p-4 text-sm font-semibold text-slate-900 [&::-webkit-details-marker]:hidden">
+                  {item.question}
+                  <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-400 transition-transform group-open:rotate-90" />
+                </summary>
+                <p className="px-4 pb-4 text-sm leading-relaxed text-slate-500">{item.answer}</p>
+              </details>
+            ))}
           </div>
-        )}
+        </section>
 
-        {showFaq && (
-          <section>
-            <div className="flex flex-col gap-3 mb-6">
-              <p className="text-sm uppercase tracking-[0.3em] text-[hsl(var(--gray-500))]">FAQ</p>
-              <h2 className="text-3xl font-bold text-[hsl(var(--dark))]">Dúvidas frequentes</h2>
-            </div>
-            <div className="space-y-4">
-              {faq.map((item: any) => (
-                <details
-                  key={item.question}
-                  className="rounded-2xl border border-[hsl(var(--gray-200))] bg-white p-5 shadow-sm"
-                >
-                  <summary className="cursor-pointer text-lg font-semibold text-[hsl(var(--dark))]">
-                    {item.question}
-                  </summary>
-                  <p className="mt-3 text-[hsl(var(--gray-600))]">{item.answer}</p>
-                </details>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <div className="text-center border border-dashed border-[hsl(var(--gray-300))] rounded-3xl p-8 space-y-4">
-          <p className="text-sm uppercase tracking-[0.3em] text-[hsl(var(--gray-500))] mb-2">Precisa de ajuda?</p>
-          <h3 className="text-2xl font-semibold text-[hsl(var(--dark))]">Fale com nossa equipe</h3>
-          <p className="text-[hsl(var(--gray-600))]">
+        {/* Contact CTA */}
+        <section className="mt-6 overflow-hidden rounded-2xl bg-slate-900 px-6 py-12 text-center">
+          <p className="text-xs font-semibold uppercase tracking-widest text-white/40">Precisa de ajuda?</p>
+          <h3 className="mt-2 text-2xl font-bold text-white">Fale com nossa equipe</h3>
+          <p className="mx-auto mt-2 max-w-md text-sm text-white/60">
             Tire dúvidas sobre modalidades, pagamentos ou suporte no dia da prova.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <a
-              href={`mailto:${supportEmail}?subject=Ajuda%20com%20inscrição`}
-              className="inline-flex items-center justify-center rounded-full bg-[hsl(var(--dark))] px-6 py-3 text-white text-sm font-semibold hover:bg-black"
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-white px-5 text-sm font-semibold text-slate-900 transition-colors hover:bg-white/90"
+              href={`mailto:${supportEmail}?subject=Ajuda%20com%20inscricao`}
             >
+              <Mail className="h-4 w-4" />
               Enviar e-mail
             </a>
             {whatsappLink && (
               <a
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/20 px-5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
                 href={whatsappLink}
-                target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center justify-center rounded-full border border-[hsl(var(--dark))] px-6 py-3 text-sm font-semibold text-[hsl(var(--dark))] hover:bg-[hsl(var(--dark))] hover:text-white"
+                target="_blank"
               >
+                <MessageCircle className="h-4 w-4" />
                 WhatsApp
               </a>
             )}
           </div>
-        </div>
-      </main>
+        </section>
 
-      <footer className="text-center text-sm text-[hsl(var(--gray-600))] py-10 border-t border-[hsl(var(--gray-200))]">
-        <p>Powered by Okê Sports • Faça sua prova acontecer.</p>
-      </footer>
-
-      {event.isRegistrationOpen && cheapestModality && (
-        <div className="md:hidden fixed bottom-4 inset-x-0 px-4 z-40">
-          <RegistrationButton
-            eventSlug={event.slug}
-            modalityId={cheapestModality.id}
-            modalityName={cheapestModality.name}
-            isDisabled={false}
-            className="w-full shadow-lg"
-            labelOverride="Garantir minha vaga"
-          />
-        </div>
-      )}
+        {/* Footer */}
+        <footer className="py-6 text-center text-xs text-slate-400">
+          Powered by Okê Sports
+        </footer>
+      </div> {/* end max-w-7xl container */}
     </div>
   );
 }
