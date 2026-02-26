@@ -24,7 +24,8 @@
     "db:setup-env": "node scripts/update-env-db-url.js",
     "db:ensure": "bash scripts/ensure-db-running.sh",
     "db:restore": "node scripts/restore-from-neon.js",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "sync:external:fcat": "tsx scripts/sync-fcat-events.ts"
   },
   "repository": {
     "type": "git",

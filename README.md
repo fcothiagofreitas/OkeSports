@@ -19,6 +19,7 @@ Sistema SaaS que conecta organizadores de eventos esportivos com participantes (
 ## 🛠 Stack Tecnológico
 
 ### Frontend
+
 - **Next.js 14+** (App Router, Server Components)
 - **TypeScript**
 - **Tailwind CSS** + shadcn/ui
@@ -26,16 +27,19 @@ Sistema SaaS que conecta organizadores de eventos esportivos com participantes (
 - **Zustand** (state management)
 
 ### Backend
+
 - **Next.js API Routes** (REST)
 - **TypeScript**
 - **PostgreSQL 14+** (Neon/Supabase)
 - **Prisma ORM**
 
 ### Pagamentos
+
 - **Mercado Pago Marketplace** (OAuth + Split Payment)
 - **Formas:** PIX, Cartão (até 12x), Boleto
 
 ### Outros
+
 - **Resend** (emails transacionais)
 - **AWS S3 / Cloudflare R2** (storage)
 - **Redis / Upstash** (cache)
@@ -171,6 +175,7 @@ npm run db:generate      # Gerar Prisma Client
 npm run db:push          # Atualizar schema (dev)
 npm run db:migrate       # Rodar migrations (prod)
 npm run db:studio        # Abrir Prisma Studio (GUI)
+npm run sync:external:fcat # Sincronizar corridas da FCAt
 
 # Qualidade de código
 npm run lint             # Rodar ESLint
@@ -178,6 +183,27 @@ npm run format           # Formatar com Prettier
 npm run format:check     # Verificar formatação
 npm run type-check       # Verificar TypeScript
 ```
+
+---
+
+## 🏁 Corridas do Ceará (FCAt)
+
+- Home pública mostra:
+- `Eventos cadastrados na OkeSports` (inscrição direta na plataforma)
+- `Corridas de rua no Ceará (FCAt)` (fonte externa com link oficial)
+- Sincronização manual:
+
+```bash
+# ano atual + próximo ano
+npm run sync:external:fcat
+
+# anos específicos
+npm run sync:external:fcat -- 2026,2027
+```
+
+- Endpoint para cron/webhook:
+- `POST /api/external-events/sync?years=2026,2027`
+- Em produção, enviar `Authorization: Bearer <EXTERNAL_EVENTS_SYNC_TOKEN>`
 
 ---
 

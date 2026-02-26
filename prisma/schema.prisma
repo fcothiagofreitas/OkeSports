@@ -28,8 +28,8 @@ model User {
   // Mercado Pago OAuth
   mpConnected      Boolean   @default(false)
   mpUserId         String?   @unique
-  mpAccessToken    String?   // AES-256 encrypted
-  mpRefreshToken   String?   // AES-256 encrypted
+  mpAccessToken    String? // AES-256 encrypted
+  mpRefreshToken   String? // AES-256 encrypted
   mpPublicKey      String?
   mpTokenExpiresAt DateTime?
 
@@ -47,9 +47,9 @@ model User {
 }
 
 model Address {
-  id           String @id @default(cuid())
-  userId       String @unique
-  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String  @id @default(cuid())
+  userId       String  @unique
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   cep          String
   street       String
   number       String
@@ -57,7 +57,7 @@ model Address {
   neighborhood String
   city         String
   state        String // UF (SP, RJ, etc)
-  country      String @default("BR")
+  country      String  @default("BR")
 
   @@map("addresses")
 }
@@ -69,7 +69,7 @@ model Address {
 model Participant {
   // Identificação
   id       String  @id @default(cuid())
-  email    String  // Não é único - pode haver múltiplos participantes com mesmo email (família, etc)
+  email    String // Não é único - pode haver múltiplos participantes com mesmo email (família, etc)
   password String? // null se criado por terceiro
 
   // Dados Pessoais
@@ -131,7 +131,7 @@ model Event {
 
   // Informações Básicas
   name             String // "Corrida de São Paulo 2025"
-  description      String @db.Text
+  description      String  @db.Text
   shortDescription String? // Resumo para cards
 
   // Datas
@@ -148,15 +148,15 @@ model Event {
   coverUrl  String? // Capa para redes sociais
 
   // Configurações
-  status           EventStatus @default(DRAFT)
-  maxRegistrations Int? // Limite total de vagas (null = ilimitado)
-  allowGroupReg    Boolean     @default(true) // Permitir inscrever terceiros
-  maxGroupSize     Int         @default(10) // Limite de pessoas por compra
+  status               EventStatus @default(DRAFT)
+  maxRegistrations     Int? // Limite total de vagas (null = ilimitado)
+  allowGroupReg        Boolean     @default(true) // Permitir inscrever terceiros
+  maxGroupSize         Int         @default(10) // Limite de pessoas por compra
   landingSellingPoints Json?
-  landingAbout        Json?
-  landingFaq          Json?
-  supportEmail        String?
-  supportWhatsapp     String?
+  landingAbout         Json?
+  landingFaq           Json?
+  supportEmail         String?
+  supportWhatsapp      String?
 
   // DNS Customizado (futuro)
   customDomain String? @unique
@@ -184,12 +184,12 @@ model Event {
 }
 
 enum EventStatus {
-  DRAFT      // Rascunho
-  PUBLISHED  // Publicado (inscrições abertas)
-  PAUSED     // Pausado (visível mas não aceita inscrições)
-  SOLD_OUT   // Esgotado
-  FINISHED   // Evento já aconteceu
-  CANCELLED  // Cancelado
+  DRAFT // Rascunho
+  PUBLISHED // Publicado (inscrições abertas)
+  PAUSED // Pausado (visível mas não aceita inscrições)
+  SOLD_OUT // Esgotado
+  FINISHED // Evento já aconteceu
+  CANCELLED // Cancelado
 }
 
 model EventLocation {
@@ -208,6 +208,44 @@ model EventLocation {
   longitude    Float?
 
   @@map("event_locations")
+}
+
+model ExternalEvent {
+  id               String              @id @default(cuid())
+  source           ExternalEventSource
+  sourceExternalId String
+  title            String
+  city             String?
+  state            String              @default("CE")
+  startDate        DateTime
+  endDate          DateTime?
+  displayPeriod    String?
+  officialUrl      String?
+  sourceUrl        String?
+  imageUrl         String?
+  shortDescription String?
+  isFeatured       Boolean             @default(false)
+  status           ExternalEventStatus @default(APPROVED)
+  dataHash         String?
+  rawPayload       Json?
+  lastSyncedAt     DateTime            @default(now())
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@unique([source, sourceExternalId])
+  @@index([status, startDate])
+  @@index([isFeatured, startDate])
+  @@map("external_events")
+}
+
+enum ExternalEventSource {
+  FCAT
+}
+
+enum ExternalEventStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 // ============================================
@@ -241,33 +279,33 @@ model Modality {
 // ============================================
 
 model Batch {
-  id           String       @id @default(cuid())
-  eventId      String
-  event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  name         String // "1º Lote", "Early Bird"
-  type         BatchType    @default(DATE) // Por data ou volume
-  startDate    DateTime? // Período (se type = DATE)
-  endDate      DateTime?
-  maxSales     Int? // Volume (se type = VOLUME)
-  currentSales Int          @default(0)
-  discountType DiscountType? // PERCENTAGE ou FIXED
-  discountValue Decimal?     @db.Decimal(10, 2)
-  active       Boolean      @default(true)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id            String        @id @default(cuid())
+  eventId       String
+  event         Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name          String // "1º Lote", "Early Bird"
+  type          BatchType     @default(DATE) // Por data ou volume
+  startDate     DateTime? // Período (se type = DATE)
+  endDate       DateTime?
+  maxSales      Int? // Volume (se type = VOLUME)
+  currentSales  Int           @default(0)
+  discountType  DiscountType? // PERCENTAGE ou FIXED
+  discountValue Decimal?      @db.Decimal(10, 2)
+  active        Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   @@index([eventId])
   @@map("batches")
 }
 
 enum BatchType {
-  DATE   // Por período de tempo
+  DATE // Por período de tempo
   VOLUME // Por quantidade vendida
 }
 
 enum DiscountType {
   PERCENTAGE // Percentual (ex: 10%)
-  FIXED      // Valor fixo (ex: R$ 20)
+  FIXED // Valor fixo (ex: R$ 20)
 }
 
 // ============================================
@@ -275,35 +313,35 @@ enum DiscountType {
 // ============================================
 
 model Kit {
-  id          String   @id @default(cuid())
-  eventId     String   @unique
-  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  id      String @id @default(cuid())
+  eventId String @unique
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   // Itens do kit (JSON array)
-  items       Json?    // [{ name: "Camiseta", included: true }, { name: "Medalha", included: true }]
+  items Json? // [{ name: "Camiseta", included: true }, { name: "Medalha", included: true }]
 
   // Tamanhos disponíveis e estoque
-  sizes       KitSizeStock[]
+  sizes KitSizeStock[]
 
   // Configurações
-  includeShirt Boolean @default(true) // Inclui camiseta no kit
+  includeShirt  Boolean @default(true) // Inclui camiseta no kit
   shirtRequired Boolean @default(false) // Tamanho é obrigatório
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("kits")
 }
 
 model KitSizeStock {
-  id        String   @id @default(cuid())
-  kitId     String
-  kit       Kit      @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  id    String @id @default(cuid())
+  kitId String
+  kit   Kit    @relation(fields: [kitId], references: [id], onDelete: Cascade)
 
-  size      String   // PP, P, M, G, GG, XG
-  stock     Int      @default(0) // Estoque disponível
-  reserved  Int      @default(0) // Reservado (inscrições pendentes)
-  sold      Int      @default(0) // Vendido (inscrições confirmadas)
+  size     String // PP, P, M, G, GG, XG
+  stock    Int    @default(0) // Estoque disponível
+  reserved Int    @default(0) // Reservado (inscrições pendentes)
+  sold     Int    @default(0) // Vendido (inscrições confirmadas)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -348,11 +386,11 @@ model Coupon {
 // ============================================
 
 model Registration {
-  id            String  @id @default(cuid())
+  id            String      @id @default(cuid())
   eventId       String
-  event         Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event         Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
   modalityId    String
-  modality      Modality @relation(fields: [modalityId], references: [id])
+  modality      Modality    @relation(fields: [modalityId], references: [id])
   participantId String
   participant   Participant @relation(fields: [participantId], references: [id])
   buyerId       String? // Participant.id de quem fez a compra
@@ -360,16 +398,16 @@ model Registration {
   coupon        Coupon?     @relation(fields: [couponId], references: [id])
 
   // Valores
-  basePrice     Decimal @db.Decimal(10, 2) // Preço original
-  discount      Decimal @db.Decimal(10, 2) @default(0)
-  subtotal      Decimal @db.Decimal(10, 2) // basePrice - discount
-  platformFee   Decimal @db.Decimal(10, 2) // 10% da subtotal (taxa Okê - paga pelo competidor)
+  basePrice      Decimal  @db.Decimal(10, 2) // Preço original
+  discount       Decimal  @default(0) @db.Decimal(10, 2)
+  subtotal       Decimal  @db.Decimal(10, 2) // basePrice - discount
+  platformFee    Decimal  @db.Decimal(10, 2) // 10% da subtotal (taxa Okê - paga pelo competidor)
   mercadoPagoFee Decimal? @db.Decimal(10, 2) // Taxa do gateway (paga pelo organizador)
-  total         Decimal @db.Decimal(10, 2) // subtotal + platformFee
+  total          Decimal  @db.Decimal(10, 2) // subtotal + platformFee
 
   // Pagamento
-  paymentId     String?        @unique // ID do Mercado Pago
-  paymentStatus PaymentStatus  @default(PENDING)
+  paymentId     String?       @unique // ID do Mercado Pago
+  paymentStatus PaymentStatus @default(PENDING)
   paymentMethod String? // pix, credit_card, boleto
 
   // Número da Inscrição (sequencial por evento)
@@ -407,16 +445,16 @@ model Registration {
 }
 
 enum PaymentStatus {
-  PENDING    // Aguardando pagamento
+  PENDING // Aguardando pagamento
   PROCESSING // Processando
-  APPROVED   // Aprovado
-  REJECTED   // Rejeitado
-  CANCELLED  // Cancelado
-  REFUNDED   // Reembolsado
+  APPROVED // Aprovado
+  REJECTED // Rejeitado
+  CANCELLED // Cancelado
+  REFUNDED // Reembolsado
 }
 
 enum RegistrationStatus {
-  PENDING   // Aguardando pagamento
+  PENDING // Aguardando pagamento
   CONFIRMED // Confirmada (paga)
   CANCELLED // Cancelada
 }
